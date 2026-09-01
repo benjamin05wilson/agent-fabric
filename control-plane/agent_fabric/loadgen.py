@@ -244,7 +244,11 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
         chaos_task.cancel()
         await asyncio.gather(chaos_task, return_exceptions=True)
     finally:
+        # Measurement is over: tear the fleet down without waiting for each stream's
+        # next heartbeat tick, which took tens of minutes against a saturated gateway.
         stop.set()
+        for task in tasks:
+            task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
     elapsed = time.perf_counter() - measurements.started
     configuration = {

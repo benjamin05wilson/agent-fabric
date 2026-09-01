@@ -4,6 +4,14 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # The worker contract is deliberately one bidirectional stream carrying
+    # oneof envelopes (WorkerMessage/ControlMessage) rather than per-RPC
+    # request/response types, and the single module keeps proto/ flat.
+    - PACKAGE_DIRECTORY_MATCH
+    - SERVICE_SUFFIX
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
 breaking:
   use:
     - FILE
