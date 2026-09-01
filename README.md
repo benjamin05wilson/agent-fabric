@@ -26,7 +26,12 @@ What the baseline found, in the order it was found:
 
 Worker-loss chaos (10% of a 1,000-worker fleet killed mid-run, 20-40 s jobs):
 
-CHAOS_PLACEHOLDER
+| Scenario | In-flight on killed workers | Attempts lost | Runs affected | Runs lost | Detection p50 / max | Recovery p50 / p99 |
+|---|---|---|---|---|---|---|
+| Random 10% | 136 | 174 | 160 | 0 | 13.2 s / 19.2 s | 50.8 s / 61.3 s |
+| Busiest 10% first | 473 | 629 | 597 | 0 | 12.0 s / 22.1 s | 61.2 s / 85.6 s |
+
+Every affected run was requeued and finished on a surviving worker, no run needed a third attempt, and the reservation audit was zero afterwards. Recovery time is re-execution plus queue wait; detection is the configured 10 s offer deadline or 15 s heartbeat window plus reconcile latency.
 
 Hostile sandbox workloads (memory bomb, fork bomb, infinite loop, disk exhaustion, forbidden network) have a runner in `tests/security/run_hostile.py` but have **not** been executed yet: they need a Linux Docker host with `runsc`.
 

@@ -26,6 +26,15 @@ Source directory: `benchmarks/reports/2026-09-01-native-4c16g/results`
 | baseline | 100 | 10,000 | 0 | 0.0 | yes | 528.6 | 20.7 | 20.6 | 256,746/444,321/457,238 | 257,142/444,604/457,458 | 0 | 0 | 62,200 | 120/107/n/a/94 | 15/32/n/a/73 |
 | baseline | 1,000 | 10,000 | 0 | 0.3 | no | 684.4 | 14.1 | 13.8 | 344,825/582,953/605,133 | 345,146/582,940/605,269 | 0 | 1,430 | 68,300 | 120/176/n/a/92 | 13/92/n/a/79 |
 | baseline | 10,000 | 10,000 | 0 | n/a | no | 988.0 | 11.3 | 0.4 | n/a/n/a/n/a | n/a/n/a/n/a | 0 | 10,000 | 0 | 120/402/n/a/100 | 5/100/n/a/82 |
+| worker-loss-busiest | 1,000 | 3,000 | 0 | 0.2 | yes | 269.6 | 13.5 | 11.3 | 132,290/202,030/205,609 | 162,027/232,233/241,002 | 0 | 0 | 0 | 119/176/86/94 | 8/84/6/71 |
+| worker-loss-random | 1,000 | 3,000 | 0 | 0.2 | yes | 234.7 | 13.6 | 12.8 | 97,102/167,647/171,825 | 126,589/197,135/206,585 | 0 | 0 | 0 | 119/173/86/93 | 8/86/6/69 |
+
+## Worker-loss chaos
+
+| Label | Workers | Killed | Selection | In-flight at kill | Lost attempts | Affected runs | Requeued and finished | Runs LOST | Detection p50/max (s) | Recovery p50/p99/max (s) | Drained | Leaked CPU (millis) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| worker-loss-busiest | 1,000 | 100 | busiest | 473 | 629 | 597 | 629 | 0 | 12.0/22.1 | 61.1/85.6/90.3 | yes | 0 |
+| worker-loss-random | 1,000 | 100 | random | 136 | 174 | 160 | 174 | 0 | 13.2/19.2 | 50.8/61.3/61.6 | yes | 0 |
 
 ## Redis
 
@@ -37,6 +46,8 @@ Source directory: `benchmarks/reports/2026-09-01-native-4c16g/results`
 | baseline | 100 | 94 | 0 | 13.40M | 93302 | 0 |
 | baseline | 1,000 | 798 | 0 | 32.27M | 898149 | 0 |
 | baseline | 10,000 | 936 | 0 | 36.81M | 2443913 | 0 |
+| worker-loss-busiest | 1,000 | 23 | 0 | 36.81M | 4861470 | 0 |
+| worker-loss-random | 1,000 | 42 | 0 | 36.81M | 4574481 | 0 |
 
 ## PostgreSQL statement profile (pg_stat_statements)
 
@@ -111,6 +122,30 @@ Source directory: `benchmarks/reports/2026-09-01-native-4c16g/results`
 | 778,009 | 28110.3 | 0.036 | 6.3 | 778009 | `UPDATE workers SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE workers.id = $2::VARCHAR` |
 | 11,785 | 23352.6 | 1.982 | 11.7 | 11146 | `SELECT attempts.id, attempts.run_id, attempts.worker_id, attempts.number, attempts.state, attempts.lease_token` |
 | 5209324 | 261925.3 |  |  |  | `TOTAL` |
+
+### PostgreSQL statements: worker-loss-busiest / 1,000 workers
+
+| Calls | Total ms | Mean ms | Max ms | Rows | Query |
+|---|---|---|---|---|---|
+| 60,012 | 6918.7 | 0.115 | 423.4 | 60012 | `SELECT workers.id, workers.protocol_version, workers.worker_version, workers.cpu_millis, workers.memory_mb, wo` |
+| 3,629 | 6323.8 | 1.743 | 5.6 | 1668159 | `SELECT runs.id, runs.project_id, runs.idempotency_key, runs.request_hash, runs.spec, runs.state, runs.priority` |
+| 3,629 | 4065.1 | 1.120 | 2.9 | 3628 | `SELECT runs.project_id, count(*) AS count_1  FROM runs  WHERE runs.state IN ($1, $2, $3) GROUP BY runs.project` |
+| 3,629 | 3710.0 | 1.022 | 7.8 | 3382588 | `SELECT workers.id, workers.protocol_version, workers.worker_version, workers.cpu_millis, workers.memory_mb, wo` |
+| 3,718 | 2309.2 | 0.621 | 2.2 | 629 | `SELECT attempts.id, attempts.run_id, attempts.worker_id, attempts.number, attempts.state, attempts.lease_token` |
+| 3,718 | 1529.5 | 0.411 | 2.1 | 3718 | `SELECT count(*) AS count_1  FROM runs  WHERE runs.state = $1` |
+| 537292 | 34113.9 |  |  |  | `TOTAL` |
+
+### PostgreSQL statements: worker-loss-random / 1,000 workers
+
+| Calls | Total ms | Mean ms | Max ms | Rows | Query |
+|---|---|---|---|---|---|
+| 52,480 | 6167.7 | 0.118 | 444.6 | 52480 | `SELECT workers.id, workers.protocol_version, workers.worker_version, workers.cpu_millis, workers.memory_mb, wo` |
+| 3,184 | 5520.7 | 1.734 | 11.2 | 1442375 | `SELECT runs.id, runs.project_id, runs.idempotency_key, runs.request_hash, runs.spec, runs.state, runs.priority` |
+| 3,184 | 3692.7 | 1.160 | 5.0 | 3183 | `SELECT runs.project_id, count(*) AS count_1  FROM runs  WHERE runs.state IN ($1, $2, $3) GROUP BY runs.project` |
+| 3,184 | 3321.3 | 1.043 | 6.0 | 2986637 | `SELECT workers.id, workers.protocol_version, workers.worker_version, workers.cpu_millis, workers.memory_mb, wo` |
+| 3,273 | 1831.3 | 0.560 | 2.2 | 184 | `SELECT attempts.id, attempts.run_id, attempts.worker_id, attempts.number, attempts.state, attempts.lease_token` |
+| 3,273 | 1286.3 | 0.393 | 2.1 | 3273 | `SELECT count(*) AS count_1  FROM runs  WHERE runs.state = $1` |
+| 478299 | 29875.4 |  |  |  | `TOTAL` |
 
 ## Queue depth and healthy workers over time (10 s samples)
 
@@ -749,4 +784,67 @@ Source directory: `benchmarks/reports/2026-09-01-native-4c16g/results`
 | 2749.2 | 9,960 | 3,971 | 11,099 | n/a | 100 | 392 |
 | 2759.6 | 9,962 | 3,803 | 11,139 | n/a | 100 | 390 |
 | 2770.3 | 9,960 | 2,715 | 11,181 | n/a | 100 | 347 |
+
+### worker-loss-busiest / 1,000 workers
+
+| t (s) | Queue depth | Healthy workers | Placements so far | Outbox lag (s) | Scheduler RSS (MB) | Gateway RSS (MB) |
+|---|---|---|---|---|---|---|
+| 0.0 | 0 | 0 | 0 | 0.0 | 83 | 90 |
+| 10.3 | 1,123 | 1,000 | 157 | 0.1 | 90 | 165 |
+| 20.4 | 2,330 | 1,000 | 299 | 0.0 | 91 | 168 |
+| 30.6 | 2,577 | 1,000 | 442 | 0.1 | 91 | 170 |
+| 40.7 | 2,422 | 1,000 | 615 | 0.1 | 91 | 170 |
+| 50.9 | 2,270 | 1,000 | 767 | 0.1 | 91 | 173 |
+| 61.1 | 2,111 | 1,000 | 926 | 0.1 | 91 | 171 |
+| 71.3 | 1,949 | 1,000 | 1,088 | 0.1 | 91 | 174 |
+| 81.5 | 1,787 | 1,000 | 1,250 | 0.1 | 91 | 173 |
+| 91.8 | 1,826 | 997 | 1,401 | 0.1 | 92 | 176 |
+| 102.0 | 2,073 | 900 | 1,527 | 0.1 | 93 | 172 |
+| 112.3 | 1,959 | 900 | 1,670 | 0.1 | 93 | 173 |
+| 122.5 | 1,804 | 900 | 1,825 | 0.1 | 93 | 172 |
+| 132.7 | 1,638 | 900 | 1,991 | 0.1 | 93 | 174 |
+| 143.0 | 1,484 | 900 | 2,146 | 0.0 | 93 | 171 |
+| 153.1 | 1,326 | 900 | 2,303 | 0.1 | 93 | 173 |
+| 163.2 | 1,157 | 900 | 2,473 | 0.1 | 93 | 171 |
+| 173.3 | 988 | 900 | 2,641 | 0.0 | 93 | 172 |
+| 183.6 | 828 | 900 | 2,801 | 0.1 | 93 | 171 |
+| 193.9 | 662 | 900 | 2,967 | 0.1 | 93 | 173 |
+| 204.1 | 489 | 900 | 3,140 | 0.0 | 93 | 172 |
+| 214.2 | 305 | 900 | 3,324 | 0.1 | 94 | 168 |
+| 224.4 | 94 | 900 | 3,536 | 0.1 | 94 | 171 |
+| 234.5 | 0 | 900 | 3,629 | 0.1 | 94 | 170 |
+| 244.6 | 0 | 900 | 3,629 | 0.1 | 94 | 172 |
+| 254.6 | 0 | 900 | 3,629 | 0.1 | 94 | 174 |
+| 264.6 | 0 | 900 | 3,629 | 0.1 | 94 | 170 |
+| 269.7 | 0 | 900 | 3,629 | 0.1 | 94 | 171 |
+
+### worker-loss-random / 1,000 workers
+
+| t (s) | Queue depth | Healthy workers | Placements so far | Outbox lag (s) | Scheduler RSS (MB) | Gateway RSS (MB) |
+|---|---|---|---|---|---|---|
+| 0.0 | 0 | 0 | 0 | 0.0 | 83 | 90 |
+| 10.1 | 1,138 | 1,000 | 166 | 0.0 | 91 | 166 |
+| 20.4 | 2,380 | 1,000 | 307 | 0.1 | 91 | 168 |
+| 30.6 | 2,526 | 1,000 | 474 | 0.1 | 91 | 169 |
+| 40.9 | 2,380 | 1,000 | 631 | 0.1 | 91 | 168 |
+| 51.0 | 2,214 | 1,000 | 796 | 0.1 | 91 | 171 |
+| 61.2 | 2,046 | 1,000 | 964 | 0.0 | 91 | 170 |
+| 71.3 | 1,877 | 1,000 | 1,134 | 0.0 | 91 | 173 |
+| 81.4 | 1,718 | 1,000 | 1,292 | 0.0 | 91 | 171 |
+| 91.6 | 1,560 | 999 | 1,462 | 0.0 | 91 | 173 |
+| 101.7 | 1,569 | 900 | 1,613 | 0.1 | 91 | 170 |
+| 111.9 | 1,400 | 900 | 1,784 | 0.1 | 91 | 173 |
+| 122.0 | 1,229 | 900 | 1,955 | 0.0 | 91 | 171 |
+| 132.2 | 1,059 | 900 | 2,125 | 0.1 | 91 | 168 |
+| 142.3 | 890 | 900 | 2,294 | 0.1 | 91 | 172 |
+| 152.5 | 732 | 900 | 2,452 | 0.1 | 91 | 170 |
+| 162.7 | 567 | 900 | 2,617 | 0.1 | 91 | 171 |
+| 172.8 | 401 | 900 | 2,783 | 0.1 | 92 | 170 |
+| 182.9 | 229 | 900 | 2,956 | 0.0 | 92 | 171 |
+| 193.1 | 26 | 900 | 3,158 | 0.1 | 93 | 170 |
+| 203.1 | 0 | 900 | 3,184 | 0.1 | 93 | 171 |
+| 213.2 | 0 | 900 | 3,184 | 0.1 | 93 | 168 |
+| 223.2 | 0 | 900 | 3,184 | 0.1 | 93 | 170 |
+| 233.2 | 0 | 900 | 3,184 | 0.1 | 93 | 171 |
+| 235.2 | 0 | 900 | 3,184 | 0.1 | 93 | 171 |
 
