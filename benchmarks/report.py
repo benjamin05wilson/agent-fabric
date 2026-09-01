@@ -128,10 +128,10 @@ def chaos_table(results: list[dict[str, Any]]) -> list[str]:
     lines = [
         "## Worker-loss chaos",
         "",
-        "| Label | Workers | Killed | In-flight at kill | Lost attempts | Affected runs |"
-        " Requeued and finished | Runs LOST | Detection p50/max (s) | Recovery p50/p99/max (s) |"
-        " Drained | Leaked CPU (millis) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Label | Workers | Killed | Selection | In-flight at kill | Lost attempts |"
+        " Affected runs | Requeued and finished | Runs LOST | Detection p50/max (s) |"
+        " Recovery p50/p99/max (s) | Drained | Leaked CPU (millis) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for item in rows:
         res = item["loadgen"]["results"]
@@ -140,11 +140,13 @@ def chaos_table(results: list[dict[str, Any]]) -> list[str]:
         recovery = audit.get("recovery") or {}
         drain = res.get("drain") or {}
         lines.append(
-            "| {label} | {tier} | {killed} | {inflight} | {lost_attempts} | {affected} |"
-            " {requeued} | {lost} | {detect} | {recover} | {drained} | {leak} |".format(
+            "| {label} | {tier} | {killed} | {selection} | {inflight} | {lost_attempts} |"
+            " {affected} | {requeued} | {lost} | {detect} | {recover} | {drained} |"
+            " {leak} |".format(
                 label=item.get("label") or "-",
                 tier=fmt(item["tier"]),
                 killed=fmt(chaos.get("killed_workers")),
+                selection=chaos.get("selection", "random"),
                 inflight=fmt(chaos.get("in_flight_attempts_at_kill")),
                 lost_attempts=fmt(recovery.get("lost_attempts_on_killed_workers")),
                 affected=fmt(recovery.get("affected_runs")),

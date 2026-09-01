@@ -340,13 +340,24 @@ async def inject_chaos(
     await asyncio.sleep(args.kill_after_seconds)
     rng = random.Random(args.seed)
     count = max(1, round(len(workers) * args.kill_fraction))
-    victims = rng.sample(workers, count)
+    if args.kill_selection == "busiest":
+        # Worst case: take the workers carrying the most in-flight attempts first,
+        # then fill the fraction with a seeded random sample of the rest.
+        busy = sorted(
+            (worker for worker in workers if worker.active),
+            key=lambda worker: (-len(worker.active), worker.worker_id),
+        )[:count]
+        idle = [worker for worker in workers if worker not in busy]
+        victims = busy + rng.sample(idle, count - len(busy))
+    else:
+        victims = rng.sample(workers, count)
     killed_perf = time.perf_counter()
     in_flight: dict[str, list[str]] = {}
     for worker in victims:
         in_flight[worker.worker_id] = worker.kill()
     measurements.chaos = {
         "kind": "worker-loss",
+        "selection": args.kill_selection,
         "killed_workers": count,
         "killed_fraction": round(count / len(workers), 4),
         "killed_at": datetime.fromtimestamp(measurements.wall_clock(killed_perf), UTC).isoformat(),
@@ -529,6 +540,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--submit-concurrency", type=int, default=100)
     result.add_argument("--kill-fraction", type=float, default=0.0)
     result.add_argument("--kill-after-seconds", type=float, default=5.0)
+    result.add_argument("--kill-selection", choices=["random", "busiest"], default="random")
     result.add_argument(
         "--database-url",
         default=os.environ.get("DATABASE_URL"),

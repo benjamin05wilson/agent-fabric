@@ -238,6 +238,8 @@ def loadgen_command(args: argparse.Namespace, tier: int, output: Path) -> list[s
             str(args.kill_fraction),
             "--kill-after-seconds",
             str(args.kill_after_seconds),
+            "--kill-selection",
+            args.kill_selection,
         ]
     return command
 
@@ -359,6 +361,7 @@ def main() -> None:
     parser.add_argument("--project-max-running", type=int, default=1_000_000)
     parser.add_argument("--kill-fraction", type=float, default=0.0)
     parser.add_argument("--kill-after-seconds", type=float, default=5.0)
+    parser.add_argument("--kill-selection", choices=["random", "busiest"], default="random")
     parser.add_argument("--label", default="")
     parser.add_argument("--results-dir", type=Path, default=ROOT / "benchmarks" / "results")
     args = parser.parse_args()

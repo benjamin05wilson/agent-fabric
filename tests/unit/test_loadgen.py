@@ -66,7 +66,9 @@ def test_chaos_selects_a_deterministic_fraction_of_the_fleet() -> None:
             )
             for index in range(10)
         ]
-        args = argparse.Namespace(kill_fraction=0.3, kill_after_seconds=0, seed=7)
+        args = argparse.Namespace(
+            kill_fraction=0.3, kill_after_seconds=0, seed=7, kill_selection="random"
+        )
         await loadgen.inject_chaos(args, workers, measurements)
         return measurements.chaos
 
@@ -75,6 +77,36 @@ def test_chaos_selects_a_deterministic_fraction_of_the_fleet() -> None:
     assert chaos["killed_fraction"] == 0.3
     assert len(chaos["killed_worker_ids"]) == 3
     assert chaos["in_flight_attempts_at_kill"] == 0
+
+
+def test_busiest_selection_takes_workers_with_in_flight_attempts_first() -> None:
+    async def scenario() -> dict[str, object]:
+        measurements = loadgen.Measurements(target_workers=10)
+        workers = [
+            loadgen.SimulatedWorker(
+                number=index,
+                address="localhost:1",
+                measurements=measurements,
+                rng=random.Random(index),
+                min_duration_ms=1,
+                max_duration_ms=1,
+                failure_rate=0.0,
+                disappear_rate=0.0,
+            )
+            for index in range(10)
+        ]
+        workers[7].active.update({"a", "b"})
+        workers[2].active.add("c")
+        args = argparse.Namespace(
+            kill_fraction=0.3, kill_after_seconds=0, seed=7, kill_selection="busiest"
+        )
+        await loadgen.inject_chaos(args, workers, measurements)
+        return measurements.chaos
+
+    chaos = asyncio.run(scenario())
+    assert chaos["killed_workers"] == 3
+    assert chaos["in_flight_attempts_at_kill"] == 3
+    assert {"sim-00000007", "sim-00000002"} <= set(chaos["killed_worker_ids"])  # type: ignore[arg-type]
 
 
 def test_parser_rejects_out_of_range_kill_fraction() -> None:
