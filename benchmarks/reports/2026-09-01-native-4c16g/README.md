@@ -68,7 +68,7 @@ should be zero.
 | Tier | Runs succeeded | Leaked cpu-millis after drain | Equivalent |
 |---|---|---|---|
 | 100 workers | 10,000 | 62,200 | 622 phantom jobs, 7.8 workers' full capacity |
-| 1,000 workers | 8,570 (not drained) | 75,600 | 756 phantom jobs |
+| 1,000 workers | 8,570 (not drained) | 68,300 net of 73 in-flight runs | 683 phantom jobs |
 
 At 100 workers five workers read as completely full with nothing running on
 them by the end of the run. Fix (`ffa65f4`): the locked re-selects use

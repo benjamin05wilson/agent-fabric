@@ -107,6 +107,7 @@ class SimulatedWorker:
         self.max_duration_ms = max_duration_ms
         self.failure_rate = failure_rate
         self.disappear_rate = disappear_rate
+        self.heartbeat_seconds = 5.0
         self.active: set[str] = set()
         self.executions: set[asyncio.Task[None]] = set()
         self.killed = False
@@ -136,9 +137,15 @@ class SimulatedWorker:
                         time.perf_counter() - self.measurements.started, 3
                     )
                     self.measurements.registered_event.set()
+                # Heartbeat on a fixed cadence like the Go worker's ticker, regardless of
+                # how busy the stream is. Heartbeating only when idle let a worker that
+                # receives a steady stream of leases fall silent, so its running leases
+                # expired mid-job (see benchmarks/reports).
+                next_heartbeat = time.monotonic() + self.heartbeat_seconds
                 while not stop.is_set():
+                    timeout = max(0.0, next_heartbeat - time.monotonic())
                     try:
-                        message = await asyncio.wait_for(self.outgoing.get(), timeout=5)
+                        message = await asyncio.wait_for(self.outgoing.get(), timeout=timeout)
                     except TimeoutError:
                         message = worker_pb2.WorkerMessage(
                             worker_id=self.worker_id,
@@ -147,6 +154,7 @@ class SimulatedWorker:
                                 active_attempt_ids=sorted(self.active),
                             ),
                         )
+                        next_heartbeat = time.monotonic() + self.heartbeat_seconds
                     yield message
 
             try:
@@ -439,6 +447,14 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
         unpublished = await connection.fetchval(
             "SELECT count(*) FROM outbox_events WHERE published_at IS NULL"
         )
+        in_flight = await connection.fetchrow(
+            "SELECT coalesce(sum((spec->'resources'->>'cpu_millis')::bigint),0) AS cpu,"
+            " coalesce(sum((spec->'resources'->>'memory_mb')::bigint),0) AS memory,"
+            " coalesce(sum((spec->'resources'->>'pids')::bigint),0) AS pids"
+            " FROM runs WHERE idempotency_key LIKE $1"
+            " AND state IN ('LEASED','RUNNING','CANCEL_REQUESTED')",
+            like,
+        )
         result: dict[str, Any] = {
             "run_states": states,
             "attempt_states": attempt_states,
@@ -463,10 +479,28 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
                 ]
             ),
             "workers_in_table": reservations["workers"] if reservations else 0,
-            "leaked_reservations": {
+            # Reservations still held minus what the runs still in flight legitimately
+            # hold. Anything left is a resource-accounting bug.
+            "reserved_after_run": {
                 "cpu_millis": int(reservations["cpu"]) if reservations else 0,
                 "memory_mb": int(reservations["memory"]) if reservations else 0,
                 "pids": int(reservations["pids"]) if reservations else 0,
+            },
+            "in_flight_reservations": {
+                "cpu_millis": int(in_flight["cpu"]) if in_flight else 0,
+                "memory_mb": int(in_flight["memory"]) if in_flight else 0,
+                "pids": int(in_flight["pids"]) if in_flight else 0,
+            },
+            "leaked_reservations": {
+                "cpu_millis": int(reservations["cpu"] - in_flight["cpu"])
+                if reservations and in_flight
+                else 0,
+                "memory_mb": int(reservations["memory"] - in_flight["memory"])
+                if reservations and in_flight
+                else 0,
+                "pids": int(reservations["pids"] - in_flight["pids"])
+                if reservations and in_flight
+                else 0,
             },
             "unpublished_outbox_events": unpublished,
         }
