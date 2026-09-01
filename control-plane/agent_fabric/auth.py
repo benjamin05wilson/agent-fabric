@@ -29,9 +29,14 @@ async def seed_development_project(session: AsyncSession) -> None:
                 id=uuid.uuid5(uuid.NAMESPACE_URL, f"agent-fabric:{settings.api_key_project}"),
                 slug=settings.api_key_project,
                 api_key_hash=digest,
+                max_queued=settings.project_max_queued,
+                max_running=settings.project_max_running,
             )
         )
-        await session.commit()
+    else:
+        project.max_queued = settings.project_max_queued
+        project.max_running = settings.project_max_running
+    await session.commit()
 
 
 async def authenticated_project(

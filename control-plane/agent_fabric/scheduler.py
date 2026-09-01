@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from prometheus_client import start_http_server
 from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -273,4 +274,6 @@ async def _main() -> None:
 
 def run() -> None:
     configure_telemetry("agent-fabric-scheduler")
+    if get_settings().metrics_port:
+        start_http_server(get_settings().metrics_port or 0)
     asyncio.run(_main())

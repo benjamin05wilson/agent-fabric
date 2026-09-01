@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     minio_secure: bool = False
     api_key: str = "af_dev_key"
     api_key_project: str = "local"
+    # Admission limits applied to the seeded development project on every startup.
+    project_max_queued: int = Field(default=1000, ge=1)
+    project_max_running: int = Field(default=20, ge=1)
     grpc_bind: str = "0.0.0.0:50051"
+    # Scheduler and gRPC gateway expose Prometheus metrics here when set (the API uses /metrics).
+    metrics_port: int | None = None
     otel_exporter_otlp_endpoint: str | None = None
     heartbeat_interval_seconds: int = Field(default=5, ge=1)
     unhealthy_after_seconds: int = Field(default=15, ge=2)

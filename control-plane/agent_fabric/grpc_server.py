@@ -10,6 +10,7 @@ from typing import Any
 
 import grpc
 from opentelemetry.instrumentation.grpc import aio_server_interceptor
+from prometheus_client import start_http_server
 from redis.asyncio import Redis
 from sqlalchemy import select
 
@@ -347,4 +348,6 @@ async def serve() -> None:
 
 def run() -> None:
     configure_telemetry("agent-fabric-grpc")
+    if get_settings().metrics_port:
+        start_http_server(get_settings().metrics_port or 0)
     asyncio.run(serve())

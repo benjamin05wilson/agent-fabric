@@ -77,7 +77,9 @@ services:
       dockerfile: control-plane/Dockerfile
       target: runtime
     entrypoint: [agent-fabric-grpc]
-    environment: *control-environment
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
     depends_on:
       api: {condition: service_healthy}
     ports:
@@ -89,7 +91,9 @@ services:
       dockerfile: control-plane/Dockerfile
       target: runtime
     entrypoint: [agent-fabric-scheduler]
-    environment: *control-environment
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9101"
     depends_on:
       api: {condition: service_healthy}
 
@@ -99,6 +103,8 @@ services:
       context: .
       dockerfile: loadgen/Dockerfile
     command: [--control, grpc:50051, --api, http://api:8000, --workers, "100", --duration, "60"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://agent_fabric:agent_fabric@postgres:5432/agent_fabric
     volumes:
       - ./benchmarks/results:/results
     depends_on:

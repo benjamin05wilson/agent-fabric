@@ -11,6 +11,7 @@ foreach ($tier in $Tiers) {
     $output = "benchmarks/results/workers-$tier.json"
     docker compose --profile load run --rm loadgen `
         --control grpc:50051 --api http://api:8000 `
-        --workers $tier --jobs $Jobs --duration $Duration --output "/results/workers-$tier.json"
+        --workers $tier --jobs $Jobs --duration $Duration --register-timeout 120 `
+        --output "/results/workers-$tier.json"
     Write-Host "Completed $tier-worker tier; report written to $output."
 }
