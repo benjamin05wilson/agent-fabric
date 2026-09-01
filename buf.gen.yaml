@@ -1,0 +1,15 @@
+version: v2
+clean: true
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: control-plane/agent_fabric/generated
+  - remote: buf.build/grpc/python
+    out: control-plane/agent_fabric/generated
+  - remote: buf.build/protocolbuffers/pyi
+    out: control-plane/agent_fabric/generated
+  - remote: buf.build/protocolbuffers/go
+    out: worker/gen
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: worker/gen
+    opt: paths=source_relative

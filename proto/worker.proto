@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package agentfabric.worker.v1;
+
+option go_package = "github.com/example/agent-fabric/worker/gen/worker/v1;workerv1";
+
+service WorkerControl {
+  rpc Connect(stream WorkerMessage) returns (stream ControlMessage);
+}
+
+message WorkerMessage {
+  string worker_id = 1;
+  oneof payload {
+    Register register = 10;
+    Heartbeat heartbeat = 11;
+    LeaseAcknowledgement acknowledgement = 12;
+    RunEvent event = 13;
+    RunCompletion completion = 14;
+    CleanupConfirmation cleanup = 15;
+  }
+}
+
+message ControlMessage {
+  oneof payload {
+    LeaseOffer lease = 10;
+    CancelRun cancel = 11;
+    DrainWorker drain = 12;
+    ProtocolError error = 13;
+  }
+}
+
+message Register {
+  string protocol_version = 1;
+  string worker_version = 2;
+  int64 cpu_millis = 3;
+  int64 memory_mb = 4;
+  int64 pids = 5;
+  repeated string capabilities = 6;
+  repeated string sandbox_backends = 7;
+}
+
+message Heartbeat {
+  int64 unix_millis = 1;
+  repeated string active_attempt_ids = 2;
+  int64 free_cpu_millis = 3;
+  int64 free_memory_mb = 4;
+}
+
+message LeaseAcknowledgement {
+  string run_id = 1;
+  string attempt_id = 2;
+  string lease_token = 3;
+  bool accepted = 4;
+  string reason = 5;
+}
+
+message LeaseOffer {
+  string run_id = 1;
+  string attempt_id = 2;
+  string lease_token = 3;
+  int64 expires_unix_millis = 4;
+  string repository_url = 5;
+  string repository_ref = 6;
+  repeated string argv = 7;
+  map<string, string> environment = 8;
+  string profile = 9;
+  string image_digest = 10;
+  int64 cpu_millis = 11;
+  int64 memory_mb = 12;
+  int64 pids = 13;
+  int64 disk_mb = 14;
+  int64 timeout_seconds = 15;
+  string network_policy = 16;
+  string traceparent = 17;
+}
+
+message RunEvent {
+  string run_id = 1;
+  string attempt_id = 2;
+  uint64 sequence = 3;
+  string stream = 4;
+  bytes data = 5;
+  int64 unix_millis = 6;
+}
+
+message RunCompletion {
+  string run_id = 1;
+  string attempt_id = 2;
+  string lease_token = 3;
+  int32 exit_code = 4;
+  string terminal_state = 5;
+  string reason_code = 6;
+  string message = 7;
+}
+
+message CleanupConfirmation {
+  string run_id = 1;
+  string attempt_id = 2;
+  bool successful = 3;
+  string message = 4;
+}
+
+message CancelRun { string run_id = 1; string attempt_id = 2; }
+message DrainWorker { string reason = 1; }
+message ProtocolError { string code = 1; string message = 2; }
+

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ".[dev]"
+      - run: ruff format --check control-plane tests migrations
+      - run: ruff check control-plane tests migrations
+      - run: mypy control-plane/agent_fabric
+      - run: pytest --cov=agent_fabric --cov-report=term-missing
+
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: worker/go.mod
+          cache-dependency-path: worker/go.sum
+      - run: go test -race ./...
+      - run: go vet ./...
+
+  contracts-and-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.47.2
+      - run: buf lint
+      - run: buf breaking --against 'https://github.com/${{ github.repository }}.git#branch=main' || test "${{ github.ref_name }}" = main
+      - run: docker compose config --quiet
+      - run: docker compose build api grpc scheduler worker loadgen
+
