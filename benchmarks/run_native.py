@@ -40,6 +40,7 @@ API = os.environ.get("BENCH_API", "http://localhost:8000")
 CONTROL = os.environ.get("BENCH_CONTROL", "localhost:50051")
 SCHEDULER_METRICS = int(os.environ.get("BENCH_SCHEDULER_METRICS_PORT", "9101"))
 GRPC_METRICS = int(os.environ.get("BENCH_GRPC_METRICS_PORT", "9102"))
+OUTBOX_METRICS = int(os.environ.get("BENCH_OUTBOX_METRICS_PORT", "9103"))
 TABLES = ("run_event_indexes", "attempts", "outbox_events", "runs", "workers")
 
 
@@ -258,6 +259,9 @@ def run_tier(args: argparse.Namespace, tier: int, results_dir: Path) -> Path:
         processes["grpc"] = Process(
             "grpc", "agent-fabric-grpc", log_dir, {"METRICS_PORT": str(GRPC_METRICS)}
         )
+        processes["outbox"] = Process(
+            "outbox", "agent-fabric-outbox", log_dir, {"METRICS_PORT": str(OUTBOX_METRICS)}
+        )
         processes["scheduler"] = Process(
             "scheduler", "agent-fabric-scheduler", log_dir, {"METRICS_PORT": str(SCHEDULER_METRICS)}
         )
@@ -296,6 +300,9 @@ def measure_tier(
             row["healthy_workers"] = scheduler_metrics.get("agent_fabric_healthy_workers")
             row["scheduling_count"] = scheduler_metrics.get("agent_fabric_scheduling_seconds_count")
             row["scheduling_sum"] = scheduler_metrics.get("agent_fabric_scheduling_seconds_sum")
+            row["outbox_lag_seconds"] = scrape(OUTBOX_METRICS).get(
+                "agent_fabric_outbox_lag_seconds"
+            )
             samples.append(row)
             time.sleep(1)
     final_scheduler = scrape(SCHEDULER_METRICS)

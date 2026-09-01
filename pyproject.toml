@@ -46,6 +46,7 @@ dev = [
 agent-fabric-api = "agent_fabric.api:run"
 agent-fabric-scheduler = "agent_fabric.scheduler:run"
 agent-fabric-grpc = "agent_fabric.grpc_server:run"
+agent-fabric-outbox = "agent_fabric.outbox:run"
 agent-fabric-loadgen = "agent_fabric.loadgen:run"
 
 [tool.hatch.build.targets.wheel]

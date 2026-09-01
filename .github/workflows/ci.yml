@@ -43,5 +43,5 @@ jobs:
       - run: buf lint
       - run: buf breaking --against 'https://github.com/${{ github.repository }}.git#branch=main' || test "${{ github.ref_name }}" = main
       - run: docker compose config --quiet
-      - run: docker compose build api grpc scheduler worker loadgen
+      - run: docker compose build api grpc outbox scheduler worker loadgen
 

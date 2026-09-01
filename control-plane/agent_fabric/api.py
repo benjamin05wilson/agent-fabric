@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import json
 import logging
@@ -34,7 +33,6 @@ from .models import (
     RunState,
     Worker,
 )
-from .outbox import OutboxPublisher
 from .schemas import LogPage, LogRecord, RunAccepted, RunCreate, RunResponse, WorkerResponse
 from .telemetry import configure_telemetry
 
@@ -64,12 +62,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     async with session_factory() as session:
         await seed_development_project(session)
     await log_store.ensure_bucket()
-    publisher = OutboxPublisher()
-    task = asyncio.create_task(publisher.run(), name="outbox-publisher")
+    # The outbox publisher runs as its own process (agent-fabric-outbox); hosting it
+    # here let a submission burst starve it and expire lease offers before delivery.
     yield
-    await publisher.close()
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
 
 
 configure_telemetry("agent-fabric-api")

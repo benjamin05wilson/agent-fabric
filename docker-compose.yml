@@ -85,6 +85,18 @@ services:
     ports:
       - 50051:50051
 
+  outbox:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+      target: runtime
+    entrypoint: [agent-fabric-outbox]
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9103"
+    depends_on:
+      api: {condition: service_healthy}
+
   scheduler:
     build:
       context: .

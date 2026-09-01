@@ -71,7 +71,7 @@ def scaling_table(results: list[dict[str, Any]]) -> list[str]:
         "| Label | Workers | Jobs accepted | 429s | Registered in (s) | Drained | Drain (s) |"
         " Placements/s | Completion/s | Time-to-start p50/p95/p99 (ms) |"
         " End-to-end p50/p95/p99 (ms) | Lost | Non-terminal | Leaked CPU (millis) |"
-        " Peak RSS api/grpc/sched (MB) | CPU api/grpc/sched (% of one core) |",
+        " Peak RSS api/grpc/outbox/sched (MB) | CPU api/grpc/outbox/sched (% of one core) |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for item in results:
@@ -107,11 +107,11 @@ def scaling_table(results: list[dict[str, Any]]) -> list[str]:
                 leak=fmt((audit.get("leaked_reservations") or {}).get("cpu_millis")),
                 rss="/".join(
                     fmt((processes.get(name) or {}).get("peak_rss_mb"), 0)
-                    for name in ("api", "grpc", "scheduler")
+                    for name in ("api", "grpc", "outbox", "scheduler")
                 ),
                 cpu="/".join(
                     fmt((processes.get(name) or {}).get("cpu_percent_of_one_core"), 0)
-                    for name in ("api", "grpc", "scheduler")
+                    for name in ("api", "grpc", "outbox", "scheduler")
                 ),
             )
         )
@@ -213,14 +213,15 @@ def timeline_section(results: list[dict[str, Any]]) -> list[str]:
         lines += [
             f"### {item.get('label') or '-'} / {fmt(item['tier'])} workers",
             "",
-            "| t (s) | Queue depth | Healthy workers | Placements so far | Scheduler RSS (MB) |"
-            " Gateway RSS (MB) |",
-            "|---|---|---|---|---|---|",
+            "| t (s) | Queue depth | Healthy workers | Placements so far | Outbox lag (s) |"
+            " Scheduler RSS (MB) | Gateway RSS (MB) |",
+            "|---|---|---|---|---|---|---|",
         ]
         for row in samples[::10] + ([samples[-1]] if len(samples) % 10 != 1 else []):
             lines.append(
                 f"| {row.get('t')} | {fmt(row.get('queue_depth'), 0)} |"
                 f" {fmt(row.get('healthy_workers'), 0)} | {fmt(row.get('scheduling_count'), 0)} |"
+                f" {fmt(row.get('outbox_lag_seconds'), 1)} |"
                 f" {fmt(row.get('scheduler_rss_mb'), 0)} | {fmt(row.get('grpc_rss_mb'), 0)} |"
             )
         lines.append("")

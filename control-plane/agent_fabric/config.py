@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     acknowledgement_deadline_seconds: int = Field(default=10, ge=1)
     max_log_bytes: int = 10 * 1024 * 1024
     scheduler_poll_seconds: float = 0.5
+    outbox_poll_seconds: float = 0.1
+    outbox_batch_size: int = Field(default=500, ge=1)
     auto_create_schema: bool = True
 
     profile_images: dict[str, str] = {

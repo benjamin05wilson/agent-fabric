@@ -63,12 +63,24 @@ class Scheduler:
             if worker is None:
                 return False
 
+            # Candidate selection read these rows without locks. Re-select them with
+            # populate_existing so the locked row's current counters replace the stale
+            # identity-map copy; otherwise concurrent releases by the gateway are
+            # overwritten and reservations leak (measured in benchmarks/reports).
             worker = await session.scalar(
-                select(Worker).where(Worker.id == worker.id).with_for_update()
+                select(Worker)
+                .where(Worker.id == worker.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
             )
             if worker is None or not self._fits(worker, run.spec):
                 return False
-            run = await session.scalar(select(Run).where(Run.id == run.id).with_for_update())
+            run = await session.scalar(
+                select(Run)
+                .where(Run.id == run.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
             if run is None or run.state != RunState.QUEUED:
                 return False
 
