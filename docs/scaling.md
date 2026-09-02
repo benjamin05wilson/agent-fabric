@@ -11,3 +11,17 @@ Report scheduling throughput, completion throughput, queue depth, p50/p95/p99 sc
 Stop escalation if memory exceeds 80% of the assigned environment, swap activity materially affects results, error rate exceeds 1%, or the control plane cannot recover. A tier only counts when its workers are durable PostgreSQL rows and simultaneously active gRPC streams. The 100,000 tier is an experiment, not an acceptance claim; do not extrapolate to one million.
 
 The first bottleneck is the first repeatable throughput plateau or disproportionate tail-latency/resource increase. Preserve the baseline report and profile before proposing a redesign.
+
+For scheduler scaling, prefill the queue while all schedulers are stopped, then
+start 1, 2, 4, or 8 processes so API submission is outside the timed drain. The
+runner preserves one worker fleet across phases and records retry offers and
+duplicate acknowledged executions separately:
+
+```powershell
+python benchmarks/run_scheduler_scale.py --workers 50000 --fleet-shards 8 `
+  --jobs 10000 --replicas 1,2,4,8 --duration 1200
+```
+
+Do not describe an unacknowledged expired offer as duplicate execution. Both are
+important, but the former tests outbound delivery/lease recovery while the latter
+tests scheduler exclusion correctness.

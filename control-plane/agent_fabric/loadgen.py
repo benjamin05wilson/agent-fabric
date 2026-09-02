@@ -326,17 +326,18 @@ async def wait_for_registration(
     args: argparse.Namespace, measurements: Measurements
 ) -> bool:
     deadline = time.perf_counter() + args.register_timeout
-    try:
-        await asyncio.wait_for(
-            measurements.registered_event.wait(), timeout=args.register_timeout
-        )
-    except TimeoutError:
-        measurements.registration = {
-            "timed_out": True,
-            "client_streams_started": measurements.registered,
-            "durable_workers": 0,
-        }
-        return False
+    if args.workers:
+        try:
+            await asyncio.wait_for(
+                measurements.registered_event.wait(), timeout=args.register_timeout
+            )
+        except TimeoutError:
+            measurements.registration = {
+                "timed_out": True,
+                "client_streams_started": measurements.registered,
+                "durable_workers": 0,
+            }
+            return False
     if not args.database_url:
         measurements.registration = {
             "timed_out": False,
@@ -733,8 +734,10 @@ def parser() -> argparse.ArgumentParser:
 
 def run() -> None:
     args = parser().parse_args()
-    if args.workers < 1 or args.workers > 1_000_000:
-        raise SystemExit("--workers must be between 1 and 1,000,000")
+    if args.workers < 0 or args.workers > 1_000_000:
+        raise SystemExit("--workers must be between 0 and 1,000,000")
+    if args.workers == 0 and args.expected_workers <= 0:
+        raise SystemExit("--expected-workers is required in submitter-only mode")
     if args.jobs < 0:
         raise SystemExit("--jobs cannot be negative")
     if not 0 <= args.gpu_workers <= args.workers:

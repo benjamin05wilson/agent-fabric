@@ -25,6 +25,20 @@ x-grpc-base: &grpc-base
   depends_on:
     api: {condition: service_healthy}
 
+x-scheduler-base: &scheduler-base
+  build:
+    context: .
+    dockerfile: control-plane/Dockerfile
+    target: runtime
+  entrypoint: [agent-fabric-scheduler]
+  environment:
+    <<: *control-environment
+    DB_POOL_SIZE: "2"
+    DB_MAX_OVERFLOW: "1"
+    METRICS_PORT: "9101"
+  depends_on:
+    api: {condition: service_healthy}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -170,16 +184,35 @@ services:
       api: {condition: service_healthy}
 
   scheduler:
-    build:
-      context: .
-      dockerfile: control-plane/Dockerfile
-      target: runtime
-    entrypoint: [agent-fabric-scheduler]
-    environment:
-      <<: *control-environment
-      METRICS_PORT: "9101"
-    depends_on:
-      api: {condition: service_healthy}
+    <<: *scheduler-base
+
+  scheduler-1:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-2:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-3:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-4:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-5:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-6:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
+
+  scheduler-7:
+    <<: *scheduler-base
+    profiles: [scheduler-scale]
 
   loadgen:
     profiles: [load]

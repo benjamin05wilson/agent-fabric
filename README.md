@@ -16,6 +16,17 @@ reservation. Sharded load generators then verified 25,000 and 50,000 active
 streams with the same 10,000/10,000 clean workload result. The 100,000 tier was
 not stable and is not claimed. Full evidence: [`benchmarks/reports/2026-09-02-gateway-sharding`](benchmarks/reports/2026-09-02-gateway-sharding/README.md).
 
+Parallel scheduler processes are now available through the `scheduler-scale`
+Compose profile. They use `FOR UPDATE SKIP LOCKED` for queued-run ownership,
+targeted worker row locks for exact CPU/memory/PID/GPU/VRAM reservations, and a
+short PostgreSQL advisory-locked commit recheck for tenant and global offer
+limits. A queued-work benchmark can compare 1/2/4/8 replicas independently of
+API submission time. The 50,000-worker multi-scheduler acceptance run is not yet
+claimed: persistent simulated fleets exposed unacknowledged outbound delivery
+retries before a clean replica-scaling matrix was obtained. Current evidence and
+the precise boundary are in
+[`benchmarks/reports/2026-09-02-parallel-scheduler`](benchmarks/reports/2026-09-02-parallel-scheduler/README.md).
+
 ## Measured results (2026-09-01, one 4-core host)
 
 Full narrative and raw data: [`benchmarks/reports/2026-09-01-native-4c16g`](benchmarks/reports/2026-09-01-native-4c16g/README.md). Simulated workers, 10,000 jobs per tier, 600 s budget per tier after submission starts.

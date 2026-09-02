@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from agent_fabric.models import Project, Run, Worker
-from agent_fabric.scheduler import Capacity, Scheduler
+from agent_fabric.scheduler import Capacity, Placement, Scheduler
 
 
 def worker() -> Worker:
@@ -194,3 +194,54 @@ def test_cpu_jobs_preserve_gpu_workers() -> None:
     gpu.capabilities = frozenset({"cuda"})
     placement = scheduler._plan([run(tenant)], [gpu, capacity("cpu")], {tenant.id: tenant}, {})
     assert placement[0].worker_id == "cpu"
+
+
+def test_commit_trim_enforces_global_offer_and_tenant_limits() -> None:
+    first = project(max_running=2)
+    second = project(max_running=10)
+    scheduler = Scheduler.__new__(Scheduler)
+    scheduler.deficits = {}
+    scheduler.settings = type(
+        "S",
+        (),
+        {
+            "scheduler_batch_size": 10,
+            "acknowledgement_deadline_seconds": 10,
+            "profile_images": {"python": "python:3.12-slim"},
+        },
+    )()
+    runs = [run(first, cpu=100, memory=128) for _ in range(3)] + [
+        run(second, cpu=100, memory=128) for _ in range(3)
+    ]
+    planned = scheduler._plan(
+        runs,
+        [capacity("worker", cpu=10000)],
+        {first.id: first, second.id: second},
+        {},
+    )
+
+    accepted = Scheduler._trim_for_commit(
+        planned,
+        {first.id: first, second.id: second},
+        {first.id: 1},
+        available_offers=3,
+    )
+
+    assert len(accepted) == 3
+    assert sum(item.project_id == first.id for item in accepted) == 1
+
+
+def test_commit_trim_accepts_no_more_than_available_offers() -> None:
+    tenant = project(max_running=100)
+    placement = Placement(
+        run_id=uuid.uuid4(),
+        project_id=tenant.id,
+        worker_id="worker",
+        attempt_number=1,
+        resources={},
+        payload={},
+        token_hash="hash",
+        expires=datetime.now(UTC),
+    )
+
+    assert Scheduler._trim_for_commit([placement], {tenant.id: tenant}, {}, 0) == []

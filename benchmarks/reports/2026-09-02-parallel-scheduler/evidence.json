@@ -1,0 +1,44 @@
+{
+  "acceptance_claimed": false,
+  "host": {
+    "docker_cpus": 24,
+    "docker_memory_gib": 62.5,
+    "gateway_shards": 8
+  },
+  "single_scheduler_control": {
+    "workers_durable": 50000,
+    "workers_active": 50000,
+    "jobs": 10000,
+    "drain_seconds": 181.254,
+    "placements_per_second": 50.98,
+    "attempts": 10000,
+    "runs_succeeded": 10000,
+    "retry_attempts": 0,
+    "runs_lost": 0,
+    "reservation_leaks": 0,
+    "unpublished_outbox_events": 0
+  },
+  "queued_work_diagnostics": [
+    {
+      "scheduler_processes": 1,
+      "jobs": 1000,
+      "drain_seconds": 25.593,
+      "effective_placements_per_second": 39.073,
+      "retry_attempts": 0,
+      "runs_lost": 0,
+      "reservation_leaks": 0
+    },
+    {
+      "scheduler_processes": 2,
+      "jobs": 1000,
+      "drain_seconds": 42.781,
+      "effective_placements_per_second": 23.375,
+      "retry_attempts": 6,
+      "expired_unacknowledged_offers": 6,
+      "duplicate_acknowledged_executions": 0,
+      "runs_lost": 0,
+      "reservation_leaks": 0
+    }
+  ],
+  "conclusion": "parallel scheduling is implemented; 50k replica scaling is not yet proven"
+}

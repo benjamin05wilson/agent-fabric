@@ -85,12 +85,15 @@ def container_stats() -> dict[str, dict[str, float]]:
             continue
         name = row.get("Name", "")
         shard = re.search(r"-grpc-([0-7])-", name)
+        scheduler_replica = re.search(r"-scheduler-([1-7])-", name)
         if name.startswith("af-scale-"):
             service = "loadgen"
         elif shard:
             service = f"grpc-{shard.group(1)}"
         elif "-grpc-" in name:
             service = "grpc-lb"
+        elif scheduler_replica:
+            service = f"scheduler-{scheduler_replica.group(1)}"
         else:
             service = next((item for item in SERVICES if f"-{item}-" in name), None)
         if service is None:
@@ -187,10 +190,10 @@ def durable_worker_count() -> int:
 
 def metrics_snapshot() -> dict[str, float | None]:
     return {
-        "placements": prometheus('agent_fabric_placements_total{instance="scheduler:9101"}'),
-        "queue_depth": prometheus('agent_fabric_queue_depth{instance="scheduler:9101"}'),
+        "placements": prometheus('sum(agent_fabric_placements_total{job="schedulers"})'),
+        "queue_depth": prometheus('max(agent_fabric_queue_depth{job="schedulers"})'),
         "outstanding_offers": prometheus(
-            'agent_fabric_outstanding_offers{instance="scheduler:9101"}'
+            'max(agent_fabric_outstanding_offers{job="schedulers"})'
         ),
         "active_streams": prometheus(
             'sum(agent_fabric_active_worker_streams{job="gateways"})'
@@ -245,6 +248,19 @@ def peaks(samples: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     if gateway_rows:
         result["gateways_total"] = {
             key: max((sum(item[key] for item in row) for row in gateway_rows), default=0.0)
+            for key in ("cpu_percent", "rss_mb", "pids")
+        }
+    scheduler_rows = [
+        [
+            values
+            for service, values in row["containers"].items()
+            if service == "scheduler" or re.fullmatch(r"scheduler-\d", service)
+        ]
+        for row in samples
+    ]
+    if scheduler_rows:
+        result["schedulers_total"] = {
+            key: max((sum(item[key] for item in row) for row in scheduler_rows), default=0.0)
             for key in ("cpu_percent", "rss_mb", "pids")
         }
     return result

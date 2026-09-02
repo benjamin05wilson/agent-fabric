@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # the real limit; see benchmarks/reports).
     scheduler_candidate_limit: int = Field(default=500, ge=1)
     scheduler_batch_size: int = Field(default=200, ge=1)
+    scheduler_worker_limit: int = Field(default=5000, ge=1)
     scheduler_max_outstanding_offers: int = Field(default=100, ge=1)
     outbox_poll_seconds: float = 0.1
     outbox_batch_size: int = Field(default=500, ge=1)
