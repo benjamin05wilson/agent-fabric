@@ -62,6 +62,7 @@ class Measurements:
     lease_latencies_ms: list[float] = field(default_factory=list)
     submitted_at: dict[str, float] = field(default_factory=dict)
     submission: dict[str, Any] = field(default_factory=dict)
+    registration: dict[str, Any] = field(default_factory=dict)
     chaos: dict[str, Any] = field(default_factory=dict)
     drain: dict[str, Any] = field(default_factory=dict)
     gpu_leases: int = 0
@@ -84,6 +85,7 @@ class Measurements:
                 round(self.completed / elapsed, 3) if elapsed else 0
             ),
             "lease_latency_ms": percentiles(self.lease_latencies_ms),
+            "registration": self.registration,
             "submission": self.submission,
             "chaos": self.chaos,
             "drain": self.drain,
@@ -126,11 +128,26 @@ class SimulatedWorker:
         self.active: set[str] = set()
         self.executions: set[asyncio.Task[None]] = set()
         self.killed = False
+        self.registration_counted = False
         self.task: asyncio.Task[None] | None = None
         self.outgoing: asyncio.Queue[worker_pb2.WorkerMessage] = asyncio.Queue(maxsize=100)
 
     async def run(self, stop: asyncio.Event) -> None:
-        async with grpc.aio.insecure_channel(self.address) as channel:
+        backoff = 0.1
+        while not stop.is_set() and not self.killed:
+            await self._connect_once(stop)
+            if stop.is_set() or self.killed:
+                return
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 5.0)
+
+    async def _connect_once(self, stop: asyncio.Event) -> None:
+        # The gRPC core normally shares a subchannel between channels in one process.
+        # A simulated fleet needs distinct TCP connections so the external load balancer
+        # can distribute its long-lived streams exactly like independent worker processes.
+        async with grpc.aio.insecure_channel(
+            self.address, options=(("grpc.use_local_subchannel_pool", 1),)
+        ) as channel:
             stub = worker_pb2_grpc.WorkerControlStub(channel)  # type: ignore[no-untyped-call]
 
             async def requests() -> AsyncIterator[worker_pb2.WorkerMessage]:
@@ -148,12 +165,14 @@ class SimulatedWorker:
                         vram_mb=self.vram_mb,
                     ),
                 )
-                self.measurements.registered += 1
-                if self.measurements.registered >= self.measurements.target_workers:
-                    self.measurements.registered_after_seconds = round(
-                        time.perf_counter() - self.measurements.started, 3
-                    )
-                    self.measurements.registered_event.set()
+                if not self.registration_counted:
+                    self.registration_counted = True
+                    self.measurements.registered += 1
+                    if self.measurements.registered >= self.measurements.target_workers:
+                        self.measurements.registered_after_seconds = round(
+                            time.perf_counter() - self.measurements.started, 3
+                        )
+                        self.measurements.registered_event.set()
                 # Heartbeat on a fixed cadence like the Go worker's ticker, regardless of
                 # how busy the stream is. Heartbeating only when idle let a worker that
                 # receives a steady stream of leases fall silent, so its running leases
@@ -265,17 +284,20 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
         worker.task = asyncio.create_task(worker.run(stop))
     tasks = [worker.task for worker in workers if worker.task is not None]
     try:
-        try:
-            await asyncio.wait_for(
-                measurements.registered_event.wait(), timeout=args.register_timeout
-            )
-        except TimeoutError:
-            measurements.submission["registration_timeout"] = True
-        await submit_jobs(args, measurements, prefix)
-        chaos_task = asyncio.create_task(inject_chaos(args, workers, measurements))
-        await wait_for_drain(args, measurements, prefix)
-        chaos_task.cancel()
-        await asyncio.gather(chaos_task, return_exceptions=True)
+        registered = await wait_for_registration(args, measurements)
+        if registered:
+            await submit_jobs(args, measurements, prefix)
+            chaos_task = asyncio.create_task(inject_chaos(args, workers, measurements))
+            await wait_for_drain(args, measurements, prefix)
+            chaos_task.cancel()
+            await asyncio.gather(chaos_task, return_exceptions=True)
+        else:
+            measurements.submission = {
+                "attempted": 0,
+                "accepted": 0,
+                "errors": 0,
+                "skipped": "durable worker registration incomplete",
+            }
     finally:
         # Measurement is over: tear the fleet down without waiting for each stream's
         # next heartbeat tick, which took tens of minutes against a saturated gateway.
@@ -298,6 +320,55 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
     if args.database_url:
         result["audit"] = await audit(args.database_url, prefix, measurements)
     return result
+
+
+async def wait_for_registration(
+    args: argparse.Namespace, measurements: Measurements
+) -> bool:
+    deadline = time.perf_counter() + args.register_timeout
+    try:
+        await asyncio.wait_for(
+            measurements.registered_event.wait(), timeout=args.register_timeout
+        )
+    except TimeoutError:
+        measurements.registration = {
+            "timed_out": True,
+            "client_streams_started": measurements.registered,
+            "durable_workers": 0,
+        }
+        return False
+    if not args.database_url:
+        measurements.registration = {
+            "timed_out": False,
+            "client_streams_started": measurements.registered,
+            "durable_workers": None,
+        }
+        return True
+
+    connection = await asyncpg.connect(_dsn(args.database_url))
+    durable = 0
+    try:
+        while time.perf_counter() < deadline:
+            durable = int(await connection.fetchval("SELECT count(*) FROM workers"))
+            expected_workers = args.expected_workers or args.workers
+            if durable >= expected_workers:
+                measurements.registration = {
+                    "timed_out": False,
+                    "client_streams_started": measurements.registered,
+                    "durable_workers": durable,
+                    "seconds": round(time.perf_counter() - measurements.started, 3),
+                }
+                return True
+            await asyncio.sleep(0.1)
+    finally:
+        await connection.close()
+    measurements.registration = {
+        "timed_out": True,
+        "client_streams_started": measurements.registered,
+        "durable_workers": durable,
+        "seconds": round(time.perf_counter() - measurements.started, 3),
+    }
+    return False
 
 
 async def submit_jobs(args: argparse.Namespace, measurements: Measurements, prefix: str) -> None:
@@ -626,6 +697,12 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--api", default="http://localhost:8000")
     result.add_argument("--api-key", default="af_dev_key")
     result.add_argument("--workers", type=int, default=100)
+    result.add_argument(
+        "--expected-workers",
+        type=int,
+        default=0,
+        help="global durable registration target when multiple load generators share a fleet",
+    )
     result.add_argument("--worker-offset", type=int, default=0)
     result.add_argument("--gpu-workers", type=int, default=0)
     result.add_argument("--gpu-count-per-worker", type=int, default=1)

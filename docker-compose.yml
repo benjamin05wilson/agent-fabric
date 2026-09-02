@@ -2,6 +2,8 @@ name: agent-fabric
 
 x-control-environment: &control-environment
   DATABASE_URL: postgresql+asyncpg://agent_fabric:agent_fabric@postgres:5432/agent_fabric
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-4}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-2}
   REDIS_URL: redis://redis:6379/0
   MINIO_ENDPOINT: minio:9000
   MINIO_ACCESS_KEY: agent_fabric
@@ -13,6 +15,15 @@ x-control-environment: &control-environment
   PROJECT_MAX_RUNNING: ${PROJECT_MAX_RUNNING:-20}
   SCHEDULER_MAX_OUTSTANDING_OFFERS: ${SCHEDULER_MAX_OUTSTANDING_OFFERS:-100}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+
+x-grpc-base: &grpc-base
+  build:
+    context: .
+    dockerfile: control-plane/Dockerfile
+    target: runtime
+  entrypoint: [agent-fabric-grpc]
+  depends_on:
+    api: {condition: service_healthy}
 
 services:
   postgres:
@@ -74,17 +85,75 @@ services:
       timeout: 2s
       retries: 20
 
-  grpc:
-    build:
-      context: .
-      dockerfile: control-plane/Dockerfile
-      target: runtime
-    entrypoint: [agent-fabric-grpc]
+  grpc-0:
+    <<: *grpc-base
     environment:
       <<: *control-environment
       METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-0
+
+  grpc-1:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-1
+
+  grpc-2:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-2
+
+  grpc-3:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-3
+
+  grpc-4:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-4
+
+  grpc-5:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-5
+
+  grpc-6:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-6
+
+  grpc-7:
+    <<: *grpc-base
+    environment:
+      <<: *control-environment
+      METRICS_PORT: "9102"
+      GATEWAY_ID: grpc-7
+
+  grpc:
+    image: haproxy:3.2-alpine
+    volumes:
+      - ./deploy/haproxy-grpc.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     depends_on:
-      api: {condition: service_healthy}
+      grpc-0: {condition: service_started}
+      grpc-1: {condition: service_started}
+      grpc-2: {condition: service_started}
+      grpc-3: {condition: service_started}
+      grpc-4: {condition: service_started}
+      grpc-5: {condition: service_started}
+      grpc-6: {condition: service_started}
+      grpc-7: {condition: service_started}
     ports:
       - 50051:50051
 

@@ -1,0 +1,59 @@
+{
+  "host": {
+    "docker_cpus": 24,
+    "docker_memory_gib": 62.5,
+    "gateway_shards": 8
+  },
+  "tiers": {
+    "10000": {
+      "durable_streams": 10000,
+      "registration_seconds": 11.231,
+      "jobs_succeeded": 10000,
+      "jobs_total": 10000,
+      "retries": 0,
+      "lost": 0,
+      "stream_errors": 0,
+      "heartbeats_per_second": 1835.748,
+      "placements_per_second": 43.836,
+      "steady_gateway_p95_ms": 0.804,
+      "steady_gateway_p99_ms": 22.536,
+      "gateway_peak_cpu_percent": 954.52,
+      "gateway_peak_rss_mib": 1298.4,
+      "postgres_peak_cpu_percent": 161.78,
+      "redis_peak_cpu_percent": 16.56,
+      "redis_peak_clients": 56,
+      "load_balancer_peak_cpu_percent": 89.12
+    },
+    "25000": {
+      "durable_streams": 25000,
+      "registration_seconds": 11.972,
+      "jobs_succeeded": 10000,
+      "jobs_total": 10000,
+      "retries": 0,
+      "lost": 0
+    },
+    "50000": {
+      "durable_streams": 50000,
+      "registration_seconds": 31.125,
+      "jobs_succeeded": 10000,
+      "jobs_total": 10000,
+      "retries": 0,
+      "lost": 0,
+      "coordinator_transient_stream_errors": 4164
+    },
+    "100000": {
+      "passed": false,
+      "observed_peak_streams_approx": 43800,
+      "failure": "Docker Desktop management API returned HTTP 500 and active streams became unstable"
+    }
+  },
+  "redis_restart": {
+    "workers": 100,
+    "jobs_succeeded": 1000,
+    "jobs_total": 1000,
+    "retries": 0,
+    "lost": 0,
+    "stream_errors": 0,
+    "unpublished_outbox_events": 0
+  }
+}

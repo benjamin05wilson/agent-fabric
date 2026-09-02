@@ -4,6 +4,18 @@ Agent Fabric is a lease-based execution control plane for running untrusted repo
 
 This repository contains an executable baseline plus the first measured evidence about it. Every number below comes from a result file committed under [`benchmarks/reports`](benchmarks/reports); nothing is a projection.
 
+## Current scale result (2026-09-02, 24-vCPU host)
+
+The gateway is now eight Python processes behind HAProxy. Each shard owns one
+supervised Redis consumer and fans outbound messages into its local connection
+registry; heartbeats are coalesced in memory and flushed in batches.
+
+The unchanged 10,000-worker benchmark passed with 10,000 real gRPC streams and
+10,000/10,000 successful jobs, with zero loss, retry, stream error, or leaked
+reservation. Sharded load generators then verified 25,000 and 50,000 active
+streams with the same 10,000/10,000 clean workload result. The 100,000 tier was
+not stable and is not claimed. Full evidence: [`benchmarks/reports/2026-09-02-gateway-sharding`](benchmarks/reports/2026-09-02-gateway-sharding/README.md).
+
 ## Measured results (2026-09-01, one 4-core host)
 
 Full narrative and raw data: [`benchmarks/reports/2026-09-01-native-4c16g`](benchmarks/reports/2026-09-01-native-4c16g/README.md). Simulated workers, 10,000 jobs per tier, 600 s budget per tier after submission starts.
@@ -21,7 +33,7 @@ What the baseline found, in the order it was found:
 
 1. **First bottleneck: the outbox publisher was starved inside the API process.** During the submission burst its lag reached 20-43 s while lease offers carry a 10 s acknowledgement deadline, so 9-11% of placements expired before delivery. Fixed by making it a separate pipelined process; post-fix lag is 3-27 ms.
 2. **Bug: scheduler lost updates leaked worker reservations.** Locked re-selects reused stale ORM snapshots and overwrote gateway releases. After 10,000 successful runs, phantom reservations equalled nearly eight workers. Fixed with `populate_existing` on the locked re-select; post-fix leak is zero.
-3. **Collapse point: the single-process gateway saturates at roughly 4,000 workers.** Each 5 s heartbeat is a PostgreSQL transaction plus a Redis write on one asyncio loop; at ~800 heartbeats/s the gateway uses a full core, registration stalls, lease delivery misses the deadline, and throughput is zero. Not fixed; it is the next redesign target.
+3. **Historical collapse point: the single-process gateway saturated at roughly 4,000 workers.** Each 5 s heartbeat was a PostgreSQL transaction plus a Redis write on one asyncio loop; at ~800 heartbeats/s the gateway used a full core. This was fixed by the sharded gateway described above.
 4. **Next bottleneck: the scheduler is serial.** One placement per transaction, reloading 500 candidates and every healthy worker each time, plateaus at 14-21 placements/s regardless of fleet size. Documented, deliberately not redesigned in the same change; redesigned and measured in part 2 below.
 
 Worker-loss chaos (10% of a 1,000-worker fleet killed mid-run, 20-40 s jobs):
@@ -52,7 +64,8 @@ What this change found:
 
 1. **Batch placement removes the scheduler ceiling.** Reading candidates and worker capacity once per iteration and writing placements in bulk takes the 100-worker tier from 478 s to 110 s and lets the 1,000-worker tier drain for the first time. The scheduler process drops from 74% to 16-41% of a core.
 2. **A faster scheduler without backpressure loses work.** The first batch version had no bound on unacknowledged offers, out-ran the gateway, and turned 1,127 of 10,000 runs into `LOST` with every worker healthy. The scheduler now caps offers in the `OFFERED` state (`SCHEDULER_MAX_OUTSTANDING_OFFERS`); the bound must track gateway acknowledgement throughput, which a static 500 does not at 1,000 workers (32% of offers wasted) and 100 does.
-3. **The gateway is now the limit at every tier.** 93-99% of a core at 100 and 1,000 workers, and the 10,000-worker collapse (part 1, finding 3) is untouched. Per-heartbeat persistence in one process is the next redesign.
+3. **Historical gateway limit.** This result motivated the later sharding and
+   heartbeat batching work; see the current scale result above.
 
 Fault scenarios beyond worker loss (200 workers, 2,000 retry-safe jobs, fresh control plane per scenario):
 
@@ -64,7 +77,9 @@ Fault scenarios beyond worker loss (200 workers, 2,000 retry-safe jobs, fresh co
 | PostgreSQL fast restart | 468 | 9.2 s | 24.1 s | 0 | 0 |
 | Redis restart | 500 | 9.4 s | **never** | 0 | **1,583** |
 
-Worker loss and PostgreSQL restarts lose nothing. A Redis restart still livelocks delivery: the outbox publisher now survives it, but every gateway stream's Redis dispatcher dies with the connection and is never recreated, so no connected worker gets another offer until the gateway restarts. Measured, not yet fixed.
+Worker loss and PostgreSQL restarts lose nothing. The Redis restart failure was
+fixed by shard-level supervised readers; a repeat 1,000-job restart experiment
+completed without loss, retry, stream error, or unpublished work.
 
 Hostile workloads, executed for the first time through the real Go worker under `runsc` (Docker 29.3, gVisor release channel, systrap platform):
 
@@ -85,17 +100,17 @@ Deployment: [`infra/terraform`](infra/terraform/README.md) creates a small AWS e
 ## Architecture
 
 ```text
-FastAPI -> PostgreSQL + transactional outbox -> outbox publisher -> Redis Streams -> scheduler
-                                                                                   |
-                                                                       bidirectional gRPC
-                                                                                   |
-                                                                         Go worker -> runsc
+FastAPI -> PostgreSQL + transactional outbox -> outbox publisher -> Redis Streams
+                                                                        |
+                                    HAProxy -> 8 gateway shards -> local connection registries
+                                                                        |
+                                                               bidirectional gRPC -> workers
 
 Worker events -> gRPC -> MinIO objects + PostgreSQL indexes
 Telemetry     -> OpenTelemetry Collector -> Tempo / Prometheus / Grafana
 ```
 
-PostgreSQL is authoritative for runs, attempts, leases, and reservations. Redis is a wake-up and delivery layer; reconciliation reconstructs work from durable state after interruptions. The API, gateway, outbox publisher, and scheduler are separate processes; the scheduler and gateway are single active instances.
+PostgreSQL is authoritative for runs, attempts, leases, and reservations. Redis is a wake-up and delivery layer; reconciliation reconstructs work from durable state after interruptions. The API, gateway shards, outbox publisher, and scheduler are separate processes. The scheduler remains a single active instance.
 
 ## Quick start
 
@@ -182,9 +197,10 @@ See [architecture](docs/architecture.md), [scheduler semantics](docs/scheduler.m
 
 - Public HTTPS Git repositories only; no submodules, LFS, private credentials, or secret injection.
 - Runtime egress is either disabled or open. There is no domain allowlist claim.
-- The scheduler and gRPC gateway are single active instances; the gateway is measured to saturate at roughly 4,000 workers per core and is now the throughput limit at every tier. The scheduler's outstanding-offer bound is a static setting that needs hand-tuning per fleet size.
-- A Redis restart stops lease delivery until the gateway restarts (measured); a full disk drops worker streams and leaks the run (measured).
+- The scheduler is a single active instance and became the placement bottleneck at the 25,000 and 50,000-worker tiers. Its outstanding-offer bound is a static setting that needs hand-tuning per fleet size.
+- The 50,000-worker tier passes; 100,000 is not stable on the measured Docker Desktop host. HAProxy and host networking need further scaling work.
+- A full disk drops worker streams and leaks the run (measured).
 - The workspace byte limit is represented in the lease but requires a quota-enabled Linux worker filesystem for hard enforcement; memory, PID, CPU, timeout, root filesystem, and network controls are enforced by the sandbox launch.
 - Hostile-workload containment is scripted but not yet measured on a `runsc` host.
 - The Terraform environment under `infra/terraform/` passes `validate` and `fmt` but has not been applied to a real AWS account from this repository.
-- Firecracker and the gateway redesign are deferred phases.
+- Firecracker is a deferred phase.

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SERVICES = {"api", "grpc", "scheduler", "outbox", "postgres", "redis", "loadgen"}
+SERVICES = {"api", "scheduler", "outbox", "postgres", "redis", "loadgen"}
 PROMETHEUS = "http://localhost:9090/api/v1/query"
 
 
@@ -84,11 +84,15 @@ def container_stats() -> dict[str, dict[str, float]]:
         except json.JSONDecodeError:
             continue
         name = row.get("Name", "")
-        service = (
-            "loadgen"
-            if name.startswith("af-scale-")
-            else next((item for item in SERVICES if f"-{item}-" in name), None)
-        )
+        shard = re.search(r"-grpc-([0-7])-", name)
+        if name.startswith("af-scale-"):
+            service = "loadgen"
+        elif shard:
+            service = f"grpc-{shard.group(1)}"
+        elif "-grpc-" in name:
+            service = "grpc-lb"
+        else:
+            service = next((item for item in SERVICES if f"-{item}-" in name), None)
         if service is None:
             continue
         result[service] = {
@@ -188,15 +192,17 @@ def metrics_snapshot() -> dict[str, float | None]:
         "outstanding_offers": prometheus(
             'agent_fabric_outstanding_offers{instance="scheduler:9101"}'
         ),
-        "active_streams": prometheus('agent_fabric_active_worker_streams{instance="grpc:9102"}'),
-        "heartbeats": prometheus('agent_fabric_heartbeats_total{instance="grpc:9102"}'),
+        "active_streams": prometheus(
+            'sum(agent_fabric_active_worker_streams{job="gateways"})'
+        ),
+        "heartbeats": prometheus('sum(agent_fabric_heartbeats_total{job="gateways"})'),
         "gateway_p95_seconds": prometheus(
             "histogram_quantile(0.95,sum by(le)(rate("
-            'agent_fabric_gateway_message_seconds_bucket{instance="grpc:9102"}[2m])))'
+            'agent_fabric_gateway_message_seconds_bucket{job="gateways"}[2m])))'
         ),
         "gateway_p99_seconds": prometheus(
             "histogram_quantile(0.99,sum by(le)(rate("
-            'agent_fabric_gateway_message_seconds_bucket{instance="grpc:9102"}[2m])))'
+            'agent_fabric_gateway_message_seconds_bucket{job="gateways"}[2m])))'
         ),
     }
 
@@ -228,6 +234,19 @@ def peaks(samples: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
             peak = result.setdefault(service, {"cpu_percent": 0.0, "rss_mb": 0.0, "pids": 0.0})
             for key in peak:
                 peak[key] = max(peak[key], values[key])
+    gateway_rows = [
+        [
+            values
+            for service, values in row["containers"].items()
+            if re.fullmatch(r"grpc-\d", service)
+        ]
+        for row in samples
+    ]
+    if gateway_rows:
+        result["gateways_total"] = {
+            key: max((sum(item[key] for item in row) for row in gateway_rows), default=0.0)
+            for key in ("cpu_percent", "rss_mb", "pids")
+        }
     return result
 
 
@@ -390,6 +409,7 @@ def main() -> None:
         "platform": platform.platform(),
         "docker_cpus": int(command(["docker", "info", "--format", "{{.NCPU}}"])),
         "docker_memory_bytes": docker_memory_bytes,
+        "gateway_shards": 8,
     }
     summary: dict[str, Any] = {"environment": environment, "tiers": []}
     for tier in tiers:

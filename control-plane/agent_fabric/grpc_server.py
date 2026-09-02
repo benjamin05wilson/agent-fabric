@@ -13,6 +13,7 @@ import grpc
 from opentelemetry.instrumentation.grpc import aio_server_interceptor
 from prometheus_client import start_http_server
 from redis.asyncio import Redis
+from redis.exceptions import ResponseError
 from sqlalchemy import select, update
 
 from .config import get_settings
@@ -21,7 +22,11 @@ from .generated import worker_pb2, worker_pb2_grpc
 from .log_store import log_store
 from .metrics import (
     ACTIVE_WORKER_STREAMS,
+    GATEWAY_EVENT_QUEUE_DEPTH,
+    GATEWAY_LOCAL_CONNECTIONS,
     GATEWAY_MESSAGE_SECONDS,
+    GATEWAY_OUTBOUND_MESSAGES,
+    GATEWAY_READER_RESTARTS,
     HEARTBEATS,
     LEASE_ACKNOWLEDGEMENTS,
     LEASES_DELIVERED,
@@ -60,13 +65,29 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
     def __init__(self) -> None:
         self.settings = get_settings()
         self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
+        self.gateway_id = self.settings.gateway_id
+        self.connections: dict[
+            str, asyncio.Queue[worker_pb2.ControlMessage | None]
+        ] = {}
         self.pending_heartbeats: dict[str, tuple[datetime, list[uuid.UUID], list[str]]] = {}
+        self.event_queue: asyncio.Queue[tuple[str, worker_pb2.RunEvent]] = asyncio.Queue(
+            maxsize=self.settings.gateway_event_queue_size
+        )
+        self.event_writers: list[asyncio.Task[None]] = []
         self.heartbeat_flusher: asyncio.Task[None] | None = None
+        self.outbound_reader: asyncio.Task[None] | None = None
 
     def start(self) -> None:
         self.heartbeat_flusher = asyncio.create_task(
             self._heartbeat_flush_loop(), name="heartbeat-flusher"
         )
+        self.outbound_reader = asyncio.create_task(
+            self._outbound_supervisor(), name="outbound-reader"
+        )
+        self.event_writers = [
+            asyncio.create_task(self._event_writer(), name=f"event-writer-{index}")
+            for index in range(self.settings.gateway_event_workers)
+        ]
 
     async def Connect(
         self,
@@ -75,11 +96,10 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
     ) -> AsyncIterator[worker_pb2.ControlMessage]:
         outgoing: asyncio.Queue[worker_pb2.ControlMessage | None] = asyncio.Queue(maxsize=1000)
         worker_id: str | None = None
-        dispatcher: asyncio.Task[None] | None = None
         ACTIVE_WORKER_STREAMS.inc()
 
         async def receive() -> None:
-            nonlocal worker_id, dispatcher
+            nonlocal worker_id
             try:
                 async for message in request_iterator:
                     if not worker_id:
@@ -91,13 +111,11 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                         worker_id = message.worker_id
                         started = time.perf_counter()
                         await self._register(worker_id, message.register)
+                        await self._attach(worker_id, outgoing)
                         GATEWAY_MESSAGE_SECONDS.labels("register").observe(
                             time.perf_counter() - started
                         )
                         WORKER_REGISTRATIONS.inc()
-                        dispatcher = asyncio.create_task(
-                            self._dispatch(worker_id, outgoing), name=f"dispatch-{worker_id}"
-                        )
                         continue
                     if message.worker_id != worker_id:
                         await context.abort(grpc.StatusCode.PERMISSION_DENIED, "worker id changed")
@@ -113,7 +131,10 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                             str(message.acknowledgement.accepted).lower()
                         ).inc()
                     elif kind == "event":
-                        await self._event(worker_id, message.event)
+                        copied_event = worker_pb2.RunEvent()
+                        copied_event.CopyFrom(message.event)
+                        await self.event_queue.put((worker_id, copied_event))
+                        GATEWAY_EVENT_QUEUE_DEPTH.set(self.event_queue.qsize())
                     elif kind == "completion":
                         await self._complete(worker_id, message.completion)
                     elif kind == "cleanup":
@@ -138,10 +159,9 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
         finally:
             ACTIVE_WORKER_STREAMS.dec()
             receiver.cancel()
-            if dispatcher:
-                dispatcher.cancel()
-            tasks = [receiver, *(task for task in [dispatcher] if task is not None)]
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(receiver, return_exceptions=True)
+            if worker_id is not None:
+                await self._detach(worker_id, outgoing)
 
     async def _register(self, worker_id: str, message: Any) -> None:
         if message.protocol_version != "v1":
@@ -188,6 +208,145 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
         while True:
             await asyncio.sleep(0.5)
             await self._flush_heartbeats()
+
+    async def _attach(
+        self,
+        worker_id: str,
+        outgoing: asyncio.Queue[worker_pb2.ControlMessage | None],
+    ) -> None:
+        previous = self.connections.get(worker_id)
+        self.connections[worker_id] = outgoing
+        GATEWAY_LOCAL_CONNECTIONS.set(len(self.connections))
+        await self.redis.hset("af:worker:owners", worker_id, self.gateway_id)
+        if previous is not None and previous is not outgoing:
+            try:
+                previous.put_nowait(None)
+            except asyncio.QueueFull:
+                pass
+
+    async def _detach(
+        self,
+        worker_id: str,
+        outgoing: asyncio.Queue[worker_pb2.ControlMessage | None],
+    ) -> None:
+        if self.connections.get(worker_id) is not outgoing:
+            return
+        del self.connections[worker_id]
+        GATEWAY_LOCAL_CONNECTIONS.set(len(self.connections))
+        # Keep the last owner as a durable routing hint. Messages arriving during
+        # reconnect remain pending on this shard and are forwarded if ownership moves.
+
+    async def _outbound_supervisor(self) -> None:
+        backoff = 0.1
+        while True:
+            try:
+                await self._outbound_loop()
+                backoff = 0.1
+            except asyncio.CancelledError:
+                raise
+            except ResponseError as error:
+                GATEWAY_READER_RESTARTS.inc()
+                if "NOGROUP" in str(error):
+                    # Benchmarks deliberately FLUSHDB between tiers. Recreate the
+                    # consumer group without logging an alarming traceback.
+                    logger.info(
+                        "gateway outbound consumer group was reset",
+                        extra={"gateway_id": self.gateway_id},
+                    )
+                else:
+                    logger.exception(
+                        "gateway outbound reader failed",
+                        extra={"gateway_id": self.gateway_id},
+                    )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 5.0)
+            except Exception:
+                GATEWAY_READER_RESTARTS.inc()
+                logger.exception(
+                    "gateway outbound reader failed", extra={"gateway_id": self.gateway_id}
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 5.0)
+
+    async def _outbound_loop(self) -> None:
+        stream = f"af:gateway:{self.gateway_id}:outbound"
+        group = "gateway"
+        try:
+            await self.redis.xgroup_create(stream, group, id="0-0", mkstream=True)
+        except ResponseError as error:
+            if "BUSYGROUP" not in str(error):
+                raise
+
+        while True:
+            pending = await self.redis.xreadgroup(
+                group, self.gateway_id, {stream: "0"}, count=100
+            )
+            has_pending = any(entries for _, entries in pending)
+            messages = (
+                pending
+                if has_pending
+                else await self.redis.xreadgroup(
+                    group, self.gateway_id, {stream: ">"}, count=100, block=1000
+                )
+            )
+            if not messages:
+                continue
+            delivered = 0
+            for _, entries in messages:
+                for entry_id, fields in entries:
+                    if await self._deliver_outbound(stream, group, entry_id, fields):
+                        delivered += 1
+            if has_pending and delivered == 0:
+                # Pending work can be waiting for a worker to reconnect. Avoid turning
+                # that durable retry into a busy loop.
+                await asyncio.sleep(0.1)
+
+    async def _deliver_outbound(
+        self,
+        stream: str,
+        group: str,
+        entry_id: str,
+        fields: dict[str, str],
+    ) -> bool:
+        worker_id = fields["worker_id"]
+        outgoing = self.connections.get(worker_id)
+        if outgoing is None:
+            owner = await self.redis.hget("af:worker:owners", worker_id)
+            if owner and owner != self.gateway_id:
+                await self.redis.xadd(
+                    f"af:gateway:{owner}:outbound", fields, maxlen=100_000, approximate=True
+                )
+                await self._finish_outbound(stream, group, entry_id)
+                return True
+            return False
+        payload = json.loads(fields["payload"])
+        kind = fields["kind"]
+        if kind == "lease":
+            message = worker_pb2.ControlMessage(lease=worker_pb2.LeaseOffer(**payload))
+            LEASES_DELIVERED.inc()
+        elif kind == "cancel":
+            message = worker_pb2.ControlMessage(
+                cancel=worker_pb2.CancelRun(
+                    run_id=payload["run_id"], attempt_id=payload["attempt_id"]
+                )
+            )
+        else:
+            logger.error("unknown outbound message", extra={"kind": kind})
+            await self._finish_outbound(stream, group, entry_id)
+            return True
+        try:
+            outgoing.put_nowait(message)
+        except asyncio.QueueFull:
+            return False
+        GATEWAY_OUTBOUND_MESSAGES.labels(kind).inc()
+        await self._finish_outbound(stream, group, entry_id)
+        return True
+
+    async def _finish_outbound(self, stream: str, group: str, entry_id: str) -> None:
+        pipeline = self.redis.pipeline(transaction=False)
+        pipeline.xack(stream, group, entry_id)
+        pipeline.xdel(stream, entry_id)
+        await pipeline.execute()
 
     async def _flush_heartbeats(self) -> int:
         pending, self.pending_heartbeats = self.pending_heartbeats, {}
@@ -244,10 +403,45 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
             return 0
         return len(pending)
 
+    async def _event_writer(self) -> None:
+        while True:
+            worker_id, event = await self.event_queue.get()
+            try:
+                started = time.perf_counter()
+                await self._event(worker_id, event)
+                GATEWAY_MESSAGE_SECONDS.labels("event_persist").observe(
+                    time.perf_counter() - started
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "worker event persistence failed",
+                    extra={"worker_id": worker_id, "attempt_id": event.attempt_id},
+                )
+            finally:
+                self.event_queue.task_done()
+                GATEWAY_EVENT_QUEUE_DEPTH.set(self.event_queue.qsize())
+
     async def close(self) -> None:
-        if self.heartbeat_flusher is not None:
-            self.heartbeat_flusher.cancel()
-            await asyncio.gather(self.heartbeat_flusher, return_exceptions=True)
+        background = [
+            task
+            for task in (self.heartbeat_flusher, self.outbound_reader)
+            if task is not None
+        ]
+        for task in background:
+            task.cancel()
+        await asyncio.gather(*background, return_exceptions=True)
+        try:
+            await asyncio.wait_for(self.event_queue.join(), timeout=5.0)
+        except TimeoutError:
+            logger.warning(
+                "timed out draining gateway event queue",
+                extra={"queued_events": self.event_queue.qsize()},
+            )
+        for task in self.event_writers:
+            task.cancel()
+        await asyncio.gather(*self.event_writers, return_exceptions=True)
         await self._flush_heartbeats()
         await self.redis.aclose()
 
@@ -298,7 +492,9 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
             attempt = await session.scalar(
                 select(Attempt).where(Attempt.id == attempt_id, Attempt.worker_id == worker_id)
             )
-            if attempt is None or attempt.state != AttemptState.RUNNING:
+            # Bulk events are persisted by separate workers so a completion can commit
+            # first. Keep accepting already-enqueued events for terminal attempts.
+            if attempt is None or attempt.state in {AttemptState.OFFERED, AttemptState.LOST}:
                 return
             existing = await session.scalar(
                 select(RunEventIndex.id).where(
@@ -385,46 +581,6 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
             if attempt:
                 attempt.cleanup_confirmed = message.successful
                 attempt.cleanup_message = message.message
-
-    async def _dispatch(
-        self, worker_id: str, outgoing: asyncio.Queue[worker_pb2.ControlMessage | None]
-    ) -> None:
-        lease_stream = f"af:lease.offer.{worker_id}"
-        # A worker becomes schedulable as soon as registration commits. Start its private
-        # lease cursor at the beginning so an offer published in the tiny gap before this
-        # dispatcher starts cannot be skipped. Entries are deleted after enqueueing.
-        stream_ids = {lease_stream: "0-0", "af:run.cancel": "$"}
-        while True:
-            messages = await self.redis.xread(stream_ids, block=1000, count=20)
-            for stream, entries in messages:
-                for entry_id, fields in entries:
-                    stream_ids[stream] = entry_id
-                    payload = json.loads(fields["payload"])
-                    if stream.endswith("run.cancel"):
-                        run_id = payload["run_id"]
-                        async with session_factory() as session:
-                            attempt = await session.scalar(
-                                select(Attempt).where(
-                                    Attempt.run_id == uuid.UUID(run_id),
-                                    Attempt.worker_id == worker_id,
-                                    Attempt.state == AttemptState.RUNNING,
-                                )
-                            )
-                        if attempt:
-                            await outgoing.put(
-                                worker_pb2.ControlMessage(
-                                    cancel=worker_pb2.CancelRun(
-                                        run_id=run_id, attempt_id=str(attempt.id)
-                                    )
-                                )
-                            )
-                        continue
-                    await outgoing.put(
-                        worker_pb2.ControlMessage(lease=worker_pb2.LeaseOffer(**payload))
-                    )
-                    LEASES_DELIVERED.inc()
-                    await self.redis.xdel(stream, entry_id)
-
 
 async def serve() -> None:
     service = WorkerControlService()

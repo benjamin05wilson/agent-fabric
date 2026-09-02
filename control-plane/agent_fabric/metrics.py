@@ -40,3 +40,20 @@ LEASES_DELIVERED = Counter(
 LEASE_ACKNOWLEDGEMENTS = Counter(
     "agent_fabric_lease_acknowledgements_total", "Lease acknowledgements processed", ["accepted"]
 )
+GATEWAY_OUTBOUND_MESSAGES = Counter(
+    "agent_fabric_gateway_outbound_messages_total",
+    "Shard-routed messages placed on worker streams",
+    ["kind"],
+)
+GATEWAY_READER_RESTARTS = Counter(
+    "agent_fabric_gateway_reader_restarts_total",
+    "Outbound Redis reader restarts after an error",
+)
+GATEWAY_LOCAL_CONNECTIONS = Gauge(
+    "agent_fabric_gateway_local_connections",
+    "Worker connections owned by this gateway shard",
+)
+GATEWAY_EVENT_QUEUE_DEPTH = Gauge(
+    "agent_fabric_gateway_event_queue_depth",
+    "Bulk worker events waiting for persistence on this gateway shard",
+)
