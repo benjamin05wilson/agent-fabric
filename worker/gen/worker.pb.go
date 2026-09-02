@@ -298,6 +298,8 @@ type Register struct {
 	Pids            int64                  `protobuf:"varint,5,opt,name=pids,proto3" json:"pids,omitempty"`
 	Capabilities    []string               `protobuf:"bytes,6,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	SandboxBackends []string               `protobuf:"bytes,7,rep,name=sandbox_backends,json=sandboxBackends,proto3" json:"sandbox_backends,omitempty"`
+	GpuCount        int64                  `protobuf:"varint,8,opt,name=gpu_count,json=gpuCount,proto3" json:"gpu_count,omitempty"`
+	VramMb          int64                  `protobuf:"varint,9,opt,name=vram_mb,json=vramMb,proto3" json:"vram_mb,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -381,12 +383,28 @@ func (x *Register) GetSandboxBackends() []string {
 	return nil
 }
 
+func (x *Register) GetGpuCount() int64 {
+	if x != nil {
+		return x.GpuCount
+	}
+	return 0
+}
+
+func (x *Register) GetVramMb() int64 {
+	if x != nil {
+		return x.VramMb
+	}
+	return 0
+}
+
 type Heartbeat struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	UnixMillis       int64                  `protobuf:"varint,1,opt,name=unix_millis,json=unixMillis,proto3" json:"unix_millis,omitempty"`
 	ActiveAttemptIds []string               `protobuf:"bytes,2,rep,name=active_attempt_ids,json=activeAttemptIds,proto3" json:"active_attempt_ids,omitempty"`
 	FreeCpuMillis    int64                  `protobuf:"varint,3,opt,name=free_cpu_millis,json=freeCpuMillis,proto3" json:"free_cpu_millis,omitempty"`
 	FreeMemoryMb     int64                  `protobuf:"varint,4,opt,name=free_memory_mb,json=freeMemoryMb,proto3" json:"free_memory_mb,omitempty"`
+	FreeGpuCount     int64                  `protobuf:"varint,5,opt,name=free_gpu_count,json=freeGpuCount,proto3" json:"free_gpu_count,omitempty"`
+	FreeVramMb       int64                  `protobuf:"varint,6,opt,name=free_vram_mb,json=freeVramMb,proto3" json:"free_vram_mb,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -445,6 +463,20 @@ func (x *Heartbeat) GetFreeCpuMillis() int64 {
 func (x *Heartbeat) GetFreeMemoryMb() int64 {
 	if x != nil {
 		return x.FreeMemoryMb
+	}
+	return 0
+}
+
+func (x *Heartbeat) GetFreeGpuCount() int64 {
+	if x != nil {
+		return x.FreeGpuCount
+	}
+	return 0
+}
+
+func (x *Heartbeat) GetFreeVramMb() int64 {
+	if x != nil {
+		return x.FreeVramMb
 	}
 	return 0
 }
@@ -526,26 +558,29 @@ func (x *LeaseAcknowledgement) GetReason() string {
 }
 
 type LeaseOffer struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	RunId             string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	AttemptId         string                 `protobuf:"bytes,2,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	LeaseToken        string                 `protobuf:"bytes,3,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
-	ExpiresUnixMillis int64                  `protobuf:"varint,4,opt,name=expires_unix_millis,json=expiresUnixMillis,proto3" json:"expires_unix_millis,omitempty"`
-	RepositoryUrl     string                 `protobuf:"bytes,5,opt,name=repository_url,json=repositoryUrl,proto3" json:"repository_url,omitempty"`
-	RepositoryRef     string                 `protobuf:"bytes,6,opt,name=repository_ref,json=repositoryRef,proto3" json:"repository_ref,omitempty"`
-	Argv              []string               `protobuf:"bytes,7,rep,name=argv,proto3" json:"argv,omitempty"`
-	Environment       map[string]string      `protobuf:"bytes,8,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Profile           string                 `protobuf:"bytes,9,opt,name=profile,proto3" json:"profile,omitempty"`
-	ImageDigest       string                 `protobuf:"bytes,10,opt,name=image_digest,json=imageDigest,proto3" json:"image_digest,omitempty"`
-	CpuMillis         int64                  `protobuf:"varint,11,opt,name=cpu_millis,json=cpuMillis,proto3" json:"cpu_millis,omitempty"`
-	MemoryMb          int64                  `protobuf:"varint,12,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
-	Pids              int64                  `protobuf:"varint,13,opt,name=pids,proto3" json:"pids,omitempty"`
-	DiskMb            int64                  `protobuf:"varint,14,opt,name=disk_mb,json=diskMb,proto3" json:"disk_mb,omitempty"`
-	TimeoutSeconds    int64                  `protobuf:"varint,15,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
-	NetworkPolicy     string                 `protobuf:"bytes,16,opt,name=network_policy,json=networkPolicy,proto3" json:"network_policy,omitempty"`
-	Traceparent       string                 `protobuf:"bytes,17,opt,name=traceparent,proto3" json:"traceparent,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	RunId                string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	AttemptId            string                 `protobuf:"bytes,2,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	LeaseToken           string                 `protobuf:"bytes,3,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+	ExpiresUnixMillis    int64                  `protobuf:"varint,4,opt,name=expires_unix_millis,json=expiresUnixMillis,proto3" json:"expires_unix_millis,omitempty"`
+	RepositoryUrl        string                 `protobuf:"bytes,5,opt,name=repository_url,json=repositoryUrl,proto3" json:"repository_url,omitempty"`
+	RepositoryRef        string                 `protobuf:"bytes,6,opt,name=repository_ref,json=repositoryRef,proto3" json:"repository_ref,omitempty"`
+	Argv                 []string               `protobuf:"bytes,7,rep,name=argv,proto3" json:"argv,omitempty"`
+	Environment          map[string]string      `protobuf:"bytes,8,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Profile              string                 `protobuf:"bytes,9,opt,name=profile,proto3" json:"profile,omitempty"`
+	ImageDigest          string                 `protobuf:"bytes,10,opt,name=image_digest,json=imageDigest,proto3" json:"image_digest,omitempty"`
+	CpuMillis            int64                  `protobuf:"varint,11,opt,name=cpu_millis,json=cpuMillis,proto3" json:"cpu_millis,omitempty"`
+	MemoryMb             int64                  `protobuf:"varint,12,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
+	Pids                 int64                  `protobuf:"varint,13,opt,name=pids,proto3" json:"pids,omitempty"`
+	DiskMb               int64                  `protobuf:"varint,14,opt,name=disk_mb,json=diskMb,proto3" json:"disk_mb,omitempty"`
+	TimeoutSeconds       int64                  `protobuf:"varint,15,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
+	NetworkPolicy        string                 `protobuf:"bytes,16,opt,name=network_policy,json=networkPolicy,proto3" json:"network_policy,omitempty"`
+	Traceparent          string                 `protobuf:"bytes,17,opt,name=traceparent,proto3" json:"traceparent,omitempty"`
+	GpuCount             int64                  `protobuf:"varint,18,opt,name=gpu_count,json=gpuCount,proto3" json:"gpu_count,omitempty"`
+	VramMb               int64                  `protobuf:"varint,19,opt,name=vram_mb,json=vramMb,proto3" json:"vram_mb,omitempty"`
+	RequiredCapabilities []string               `protobuf:"bytes,20,rep,name=required_capabilities,json=requiredCapabilities,proto3" json:"required_capabilities,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *LeaseOffer) Reset() {
@@ -695,6 +730,27 @@ func (x *LeaseOffer) GetTraceparent() string {
 		return x.Traceparent
 	}
 	return ""
+}
+
+func (x *LeaseOffer) GetGpuCount() int64 {
+	if x != nil {
+		return x.GpuCount
+	}
+	return 0
+}
+
+func (x *LeaseOffer) GetVramMb() int64 {
+	if x != nil {
+		return x.VramMb
+	}
+	return 0
+}
+
+func (x *LeaseOffer) GetRequiredCapabilities() []string {
+	if x != nil {
+		return x.RequiredCapabilities
+	}
+	return nil
 }
 
 type RunEvent struct {
@@ -1112,7 +1168,7 @@ const file_worker_proto_rawDesc = "" +
 	"\x06cancel\x18\v \x01(\v2 .agentfabric.worker.v1.CancelRunH\x00R\x06cancel\x12:\n" +
 	"\x05drain\x18\f \x01(\v2\".agentfabric.worker.v1.DrainWorkerH\x00R\x05drain\x12<\n" +
 	"\x05error\x18\r \x01(\v2$.agentfabric.worker.v1.ProtocolErrorH\x00R\x05errorB\t\n" +
-	"\apayload\"\xfb\x01\n" +
+	"\apayload\"\xb1\x02\n" +
 	"\bRegister\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\tR\x0fprotocolVersion\x12%\n" +
 	"\x0eworker_version\x18\x02 \x01(\tR\rworkerVersion\x12\x1d\n" +
@@ -1121,13 +1177,18 @@ const file_worker_proto_rawDesc = "" +
 	"\tmemory_mb\x18\x04 \x01(\x03R\bmemoryMb\x12\x12\n" +
 	"\x04pids\x18\x05 \x01(\x03R\x04pids\x12\"\n" +
 	"\fcapabilities\x18\x06 \x03(\tR\fcapabilities\x12)\n" +
-	"\x10sandbox_backends\x18\a \x03(\tR\x0fsandboxBackends\"\xa8\x01\n" +
+	"\x10sandbox_backends\x18\a \x03(\tR\x0fsandboxBackends\x12\x1b\n" +
+	"\tgpu_count\x18\b \x01(\x03R\bgpuCount\x12\x17\n" +
+	"\avram_mb\x18\t \x01(\x03R\x06vramMb\"\xf0\x01\n" +
 	"\tHeartbeat\x12\x1f\n" +
 	"\vunix_millis\x18\x01 \x01(\x03R\n" +
 	"unixMillis\x12,\n" +
 	"\x12active_attempt_ids\x18\x02 \x03(\tR\x10activeAttemptIds\x12&\n" +
 	"\x0ffree_cpu_millis\x18\x03 \x01(\x03R\rfreeCpuMillis\x12$\n" +
-	"\x0efree_memory_mb\x18\x04 \x01(\x03R\ffreeMemoryMb\"\xa1\x01\n" +
+	"\x0efree_memory_mb\x18\x04 \x01(\x03R\ffreeMemoryMb\x12$\n" +
+	"\x0efree_gpu_count\x18\x05 \x01(\x03R\ffreeGpuCount\x12 \n" +
+	"\ffree_vram_mb\x18\x06 \x01(\x03R\n" +
+	"freeVramMb\"\xa1\x01\n" +
 	"\x14LeaseAcknowledgement\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1d\n" +
 	"\n" +
@@ -1135,7 +1196,7 @@ const file_worker_proto_rawDesc = "" +
 	"\vlease_token\x18\x03 \x01(\tR\n" +
 	"leaseToken\x12\x1a\n" +
 	"\baccepted\x18\x04 \x01(\bR\baccepted\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\"\xa3\x05\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\x8e\x06\n" +
 	"\n" +
 	"LeaseOffer\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1d\n" +
@@ -1158,7 +1219,10 @@ const file_worker_proto_rawDesc = "" +
 	"\adisk_mb\x18\x0e \x01(\x03R\x06diskMb\x12'\n" +
 	"\x0ftimeout_seconds\x18\x0f \x01(\x03R\x0etimeoutSeconds\x12%\n" +
 	"\x0enetwork_policy\x18\x10 \x01(\tR\rnetworkPolicy\x12 \n" +
-	"\vtraceparent\x18\x11 \x01(\tR\vtraceparent\x1a>\n" +
+	"\vtraceparent\x18\x11 \x01(\tR\vtraceparent\x12\x1b\n" +
+	"\tgpu_count\x18\x12 \x01(\x03R\bgpuCount\x12\x17\n" +
+	"\avram_mb\x18\x13 \x01(\x03R\x06vramMb\x123\n" +
+	"\x15required_capabilities\x18\x14 \x03(\tR\x14requiredCapabilities\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa9\x01\n" +

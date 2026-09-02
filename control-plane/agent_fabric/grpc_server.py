@@ -3,21 +3,30 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import grpc
 from opentelemetry.instrumentation.grpc import aio_server_interceptor
 from prometheus_client import start_http_server
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from .config import get_settings
 from .db import session_factory
 from .generated import worker_pb2, worker_pb2_grpc
 from .log_store import log_store
+from .metrics import (
+    ACTIVE_WORKER_STREAMS,
+    GATEWAY_MESSAGE_SECONDS,
+    HEARTBEATS,
+    LEASE_ACKNOWLEDGEMENTS,
+    LEASES_DELIVERED,
+    WORKER_REGISTRATIONS,
+)
 from .models import (
     Attempt,
     AttemptState,
@@ -43,12 +52,21 @@ def _release(worker: Worker, run: Run) -> None:
     worker.reserved_cpu_millis = max(0, worker.reserved_cpu_millis - resources["cpu_millis"])
     worker.reserved_memory_mb = max(0, worker.reserved_memory_mb - resources["memory_mb"])
     worker.reserved_pids = max(0, worker.reserved_pids - resources["pids"])
+    worker.reserved_gpu_count = max(0, worker.reserved_gpu_count - resources.get("gpu", 0))
+    worker.reserved_vram_mb = max(0, worker.reserved_vram_mb - resources.get("vram_mb", 0))
 
 
 class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
     def __init__(self) -> None:
         self.settings = get_settings()
         self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
+        self.pending_heartbeats: dict[str, tuple[datetime, list[uuid.UUID], list[str]]] = {}
+        self.heartbeat_flusher: asyncio.Task[None] | None = None
+
+    def start(self) -> None:
+        self.heartbeat_flusher = asyncio.create_task(
+            self._heartbeat_flush_loop(), name="heartbeat-flusher"
+        )
 
     async def Connect(
         self,
@@ -58,6 +76,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
         outgoing: asyncio.Queue[worker_pb2.ControlMessage | None] = asyncio.Queue(maxsize=1000)
         worker_id: str | None = None
         dispatcher: asyncio.Task[None] | None = None
+        ACTIVE_WORKER_STREAMS.inc()
 
         async def receive() -> None:
             nonlocal worker_id, dispatcher
@@ -70,7 +89,12 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                             )
                             return
                         worker_id = message.worker_id
+                        started = time.perf_counter()
                         await self._register(worker_id, message.register)
+                        GATEWAY_MESSAGE_SECONDS.labels("register").observe(
+                            time.perf_counter() - started
+                        )
+                        WORKER_REGISTRATIONS.inc()
                         dispatcher = asyncio.create_task(
                             self._dispatch(worker_id, outgoing), name=f"dispatch-{worker_id}"
                         )
@@ -79,16 +103,24 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                         await context.abort(grpc.StatusCode.PERMISSION_DENIED, "worker id changed")
                         return
                     kind = message.WhichOneof("payload")
+                    started = time.perf_counter()
                     if kind == "heartbeat":
                         await self._heartbeat(worker_id, message.heartbeat)
+                        HEARTBEATS.inc()
                     elif kind == "acknowledgement":
                         await self._acknowledge(worker_id, message.acknowledgement)
+                        LEASE_ACKNOWLEDGEMENTS.labels(
+                            str(message.acknowledgement.accepted).lower()
+                        ).inc()
                     elif kind == "event":
                         await self._event(worker_id, message.event)
                     elif kind == "completion":
                         await self._complete(worker_id, message.completion)
                     elif kind == "cleanup":
                         await self._cleanup(worker_id, message.cleanup)
+                    GATEWAY_MESSAGE_SECONDS.labels(kind or "unknown").observe(
+                        time.perf_counter() - started
+                    )
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -104,6 +136,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                     break
                 yield response
         finally:
+            ACTIVE_WORKER_STREAMS.dec()
             receiver.cancel()
             if dispatcher:
                 dispatcher.cancel()
@@ -121,6 +154,8 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                 "cpu_millis": message.cpu_millis,
                 "memory_mb": message.memory_mb,
                 "pids": message.pids,
+                "gpu_count": message.gpu_count,
+                "vram_mb": message.vram_mb,
                 "capabilities": list(message.capabilities),
                 "sandbox_backends": list(message.sandbox_backends),
                 "last_seen_at": utcnow(),
@@ -133,35 +168,88 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
 
     async def _heartbeat(self, worker_id: str, message: Any) -> None:
         now = utcnow()
-        expiry = now + timedelta(seconds=self.settings.unhealthy_after_seconds)
-        active_ids = []
+        active_ids: list[uuid.UUID] = []
         for raw_id in message.active_attempt_ids:
             try:
                 active_ids.append(uuid.UUID(raw_id))
             except ValueError:
                 continue
-        async with session_factory() as session, session.begin():
-            worker = await session.get(Worker, worker_id, with_for_update=True)
-            if worker is None:
-                raise ValueError("worker is not registered")
-            worker.last_seen_at = now
-            if active_ids:
-                attempts = (
-                    await session.scalars(
-                        select(Attempt).where(
-                            Attempt.id.in_(active_ids),
-                            Attempt.worker_id == worker_id,
+        # Coalesce heartbeats in memory. A fleet of 10,000 workers produces 2,000
+        # heartbeats/s; one PostgreSQL transaction plus one Redis command per heartbeat
+        # saturated the gateway at roughly 4,000 workers. The flusher persists the latest
+        # heartbeat for every worker in bounded batches.
+        self.pending_heartbeats[worker_id] = (
+            now,
+            active_ids,
+            list(message.active_attempt_ids),
+        )
+
+    async def _heartbeat_flush_loop(self) -> None:
+        while True:
+            await asyncio.sleep(0.5)
+            await self._flush_heartbeats()
+
+    async def _flush_heartbeats(self) -> int:
+        pending, self.pending_heartbeats = self.pending_heartbeats, {}
+        if not pending:
+            return 0
+        now = utcnow()
+        expiry = now + timedelta(seconds=self.settings.unhealthy_after_seconds)
+        active_ids = sorted(
+            {attempt_id for _, ids, _ in pending.values() for attempt_id in ids}, key=str
+        )
+        try:
+            # Worker liveness and attempt renewal intentionally use separate transactions.
+            # Completion locks Attempt -> Run -> Worker; holding Worker while bulk-locking
+            # Attempt rows creates the inverse order and can deadlock under load.
+            async with session_factory() as session, session.begin():
+                await session.execute(
+                    update(Worker).where(Worker.id.in_(pending)).values(last_seen_at=now)
+                )
+
+            # Lock renewals in a deterministic order and skip attempts currently being
+            # completed. A completing attempt no longer needs its lease extended.
+            for offset in range(0, len(active_ids), 500):
+                chunk = active_ids[offset : offset + 500]
+                async with session_factory() as session, session.begin():
+                    locked_attempts = (
+                        select(Attempt.id)
+                        .where(
+                            Attempt.id.in_(chunk),
                             Attempt.state == AttemptState.RUNNING,
                         )
+                        .order_by(Attempt.id)
+                        .with_for_update(skip_locked=True)
+                        .cte("heartbeat_attempts")
                     )
-                ).all()
-                for attempt in attempts:
-                    attempt.lease_expires_at = expiry
-        await self.redis.hset(
-            "af:worker:liveness",
-            worker_id,
-            json.dumps({"seen": now.timestamp(), "active": list(message.active_attempt_ids)}),
-        )
+                    await session.execute(
+                        update(Attempt)
+                        .where(Attempt.id.in_(select(locked_attempts.c.id)))
+                        .values(lease_expires_at=expiry)
+                    )
+
+            await self.redis.hset(
+                "af:worker:liveness",
+                mapping={
+                    worker_id: json.dumps(
+                        {"seen": seen.timestamp(), "active": active}, separators=(",", ":")
+                    )
+                    for worker_id, (seen, _, active) in pending.items()
+                },
+            )
+        except Exception:
+            for worker_id, heartbeat in pending.items():
+                self.pending_heartbeats.setdefault(worker_id, heartbeat)
+            logger.exception("heartbeat batch failed", extra={"worker_count": len(pending)})
+            return 0
+        return len(pending)
+
+    async def close(self) -> None:
+        if self.heartbeat_flusher is not None:
+            self.heartbeat_flusher.cancel()
+            await asyncio.gather(self.heartbeat_flusher, return_exceptions=True)
+        await self._flush_heartbeats()
+        await self.redis.aclose()
 
     async def _acknowledge(self, worker_id: str, message: Any) -> None:
         attempt_id = uuid.UUID(message.attempt_id)
@@ -301,7 +389,11 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
     async def _dispatch(
         self, worker_id: str, outgoing: asyncio.Queue[worker_pb2.ControlMessage | None]
     ) -> None:
-        stream_ids = {f"af:lease.offer.{worker_id}": "$", "af:run.cancel": "$"}
+        lease_stream = f"af:lease.offer.{worker_id}"
+        # A worker becomes schedulable as soon as registration commits. Start its private
+        # lease cursor at the beginning so an offer published in the tiny gap before this
+        # dispatcher starts cannot be skipped. Entries are deleted after enqueueing.
+        stream_ids = {lease_stream: "0-0", "af:run.cancel": "$"}
         while True:
             messages = await self.redis.xread(stream_ids, block=1000, count=20)
             for stream, entries in messages:
@@ -330,20 +422,27 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                     await outgoing.put(
                         worker_pb2.ControlMessage(lease=worker_pb2.LeaseOffer(**payload))
                     )
+                    LEASES_DELIVERED.inc()
+                    await self.redis.xdel(stream, entry_id)
 
 
 async def serve() -> None:
+    service = WorkerControlService()
+    service.start()
     server = grpc.aio.server(
         interceptors=[aio_server_interceptor()],  # type: ignore[no-untyped-call]
         options=(("grpc.max_receive_message_length", 4 * 1024 * 1024),),
     )
     worker_pb2_grpc.add_WorkerControlServicer_to_server(  # type: ignore[no-untyped-call]
-        WorkerControlService(), server
+        service, server
     )
     server.add_insecure_port(get_settings().grpc_bind)
     await server.start()
     logger.info("gRPC gateway listening", extra={"bind": get_settings().grpc_bind})
-    await server.wait_for_termination()
+    try:
+        await server.wait_for_termination()
+    finally:
+        await service.close()
 
 
 def run() -> None:

@@ -16,6 +16,8 @@ type Spec struct {
 	CPUMillis      int64
 	MemoryMB       int64
 	PIDs           int64
+	GPUCount       int64
+	VRAMMB         int64
 	DiskMB         int64
 	TimeoutSeconds int64
 	NetworkPolicy  string

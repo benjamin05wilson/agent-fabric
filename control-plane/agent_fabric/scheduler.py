@@ -4,7 +4,7 @@ import logging
 import secrets
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -40,23 +40,42 @@ class Capacity:
     free_cpu: int
     free_memory: int
     free_pids: int
+    gpu_count: int = 0
+    vram_mb: int = 0
+    free_gpu: int = 0
+    free_vram: int = 0
+    capabilities: frozenset[str] = field(default_factory=frozenset)
 
-    def fits(self, resources: dict[str, int]) -> bool:
+    def fits(
+        self,
+        resources: dict[str, int],
+        required_capabilities: list[str] | tuple[str, ...] = (),
+    ) -> bool:
         return (
             self.free_cpu >= resources["cpu_millis"]
             and self.free_memory >= resources["memory_mb"]
             and self.free_pids >= resources["pids"]
+            and self.free_gpu >= resources.get("gpu", 0)
+            and self.free_vram >= resources.get("vram_mb", 0)
+            and set(required_capabilities).issubset(self.capabilities)
         )
 
     def remaining_dominant(self, resources: dict[str, int]) -> float:
         cpu_left = (self.free_cpu - resources["cpu_millis"]) / self.cpu_millis
         memory_left = (self.free_memory - resources["memory_mb"]) / self.memory_mb
-        return max(cpu_left, memory_left)
+        dimensions = [cpu_left, memory_left]
+        if resources.get("gpu", 0):
+            dimensions.append((self.free_gpu - resources["gpu"]) / self.gpu_count)
+        if resources.get("vram_mb", 0):
+            dimensions.append((self.free_vram - resources["vram_mb"]) / self.vram_mb)
+        return max(dimensions)
 
     def reserve(self, resources: dict[str, int]) -> None:
         self.free_cpu -= resources["cpu_millis"]
         self.free_memory -= resources["memory_mb"]
         self.free_pids -= resources["pids"]
+        self.free_gpu -= resources.get("gpu", 0)
+        self.free_vram -= resources.get("vram_mb", 0)
 
 
 @dataclass
@@ -171,9 +190,14 @@ class Scheduler:
                     Worker.cpu_millis,
                     Worker.memory_mb,
                     Worker.pids,
+                    Worker.gpu_count,
+                    Worker.vram_mb,
                     Worker.reserved_cpu_millis,
                     Worker.reserved_memory_mb,
                     Worker.reserved_pids,
+                    Worker.reserved_gpu_count,
+                    Worker.reserved_vram_mb,
+                    Worker.capabilities,
                     Worker.sandbox_backends,
                 ).where(Worker.draining.is_(False), Worker.last_seen_at >= cutoff)
             )
@@ -185,9 +209,14 @@ class Scheduler:
                 cpu_millis=row.cpu_millis,
                 memory_mb=row.memory_mb,
                 pids=row.pids,
+                gpu_count=row.gpu_count,
+                vram_mb=row.vram_mb,
                 free_cpu=row.cpu_millis - row.reserved_cpu_millis,
                 free_memory=row.memory_mb - row.reserved_memory_mb,
                 free_pids=row.pids - row.reserved_pids,
+                free_gpu=row.gpu_count - row.reserved_gpu_count,
+                free_vram=row.vram_mb - row.reserved_vram_mb,
+                capabilities=frozenset(row.capabilities),
             )
             for row in rows
             if "gvisor" in row.sandbox_backends
@@ -247,12 +276,18 @@ class Scheduler:
             if running.get(run.project_id, 0) >= project.max_running:
                 continue
             resources = run.spec["resources"]
+            required_capabilities = run.spec.get("required_capabilities", [])
             best: Capacity | None = None
-            best_value = 0.0
+            best_value = (0, 0.0)
             for capacity in capacities:
-                if not capacity.fits(resources):
+                if not capacity.fits(resources, required_capabilities):
                     continue
-                value = capacity.remaining_dominant(resources)
+                # Preserve scarce accelerators for jobs that request them. Within the same
+                # worker class, retain best-fit packing by dominant remaining resource.
+                value = (
+                    int(resources.get("gpu", 0) == 0 and capacity.gpu_count > 0),
+                    capacity.remaining_dominant(resources),
+                )
                 if best is None or value < best_value:
                     best, best_value = capacity, value
             if best is None:
@@ -311,10 +346,11 @@ class Scheduler:
         reservations: dict[str, dict[str, int]] = {}
         for placement in placements:
             totals = reservations.setdefault(
-                placement.worker_id, {"cpu_millis": 0, "memory_mb": 0, "pids": 0}
+                placement.worker_id,
+                {"cpu_millis": 0, "memory_mb": 0, "pids": 0, "gpu": 0, "vram_mb": 0},
             )
             for key in totals:
-                totals[key] += placement.resources[key]
+                totals[key] += placement.resources.get(key, 0)
         for worker_id, totals in reservations.items():
             await session.execute(
                 update(Worker)
@@ -323,6 +359,8 @@ class Scheduler:
                     reserved_cpu_millis=Worker.reserved_cpu_millis + totals["cpu_millis"],
                     reserved_memory_mb=Worker.reserved_memory_mb + totals["memory_mb"],
                     reserved_pids=Worker.reserved_pids + totals["pids"],
+                    reserved_gpu_count=Worker.reserved_gpu_count + totals["gpu"],
+                    reserved_vram_mb=Worker.reserved_vram_mb + totals["vram_mb"],
                 )
             )
         await session.flush()
@@ -335,6 +373,11 @@ class Scheduler:
             and worker.cpu_millis - worker.reserved_cpu_millis >= resources["cpu_millis"]
             and worker.memory_mb - worker.reserved_memory_mb >= resources["memory_mb"]
             and worker.pids - worker.reserved_pids >= resources["pids"]
+            and (worker.gpu_count or 0) - (worker.reserved_gpu_count or 0)
+            >= resources.get("gpu", 0)
+            and (worker.vram_mb or 0) - (worker.reserved_vram_mb or 0)
+            >= resources.get("vram_mb", 0)
+            and set(spec.get("required_capabilities", [])).issubset(worker.capabilities)
         )
 
     def _lease_payload(
@@ -352,8 +395,15 @@ class Scheduler:
             "environment": spec["environment"],
             "profile": spec["profile"],
             "image_digest": self.settings.profile_images[spec["profile"]],
-            **spec["resources"],
+            "cpu_millis": spec["resources"]["cpu_millis"],
+            "memory_mb": spec["resources"]["memory_mb"],
+            "pids": spec["resources"]["pids"],
+            "disk_mb": spec["resources"]["disk_mb"],
+            "timeout_seconds": spec["resources"]["timeout_seconds"],
             "network_policy": spec["network"],
+            "gpu_count": spec["resources"].get("gpu", 0),
+            "vram_mb": spec["resources"].get("vram_mb", 0),
+            "required_capabilities": spec.get("required_capabilities", []),
             "traceparent": spec.get("_trace_context", {}).get("traceparent", ""),
         }
 
@@ -415,6 +465,8 @@ class Scheduler:
         worker.reserved_cpu_millis = max(0, worker.reserved_cpu_millis - resources["cpu_millis"])
         worker.reserved_memory_mb = max(0, worker.reserved_memory_mb - resources["memory_mb"])
         worker.reserved_pids = max(0, worker.reserved_pids - resources["pids"])
+        worker.reserved_gpu_count = max(0, worker.reserved_gpu_count - resources.get("gpu", 0))
+        worker.reserved_vram_mb = max(0, worker.reserved_vram_mb - resources.get("vram_mb", 0))
 
     async def close(self) -> None:
         self.stopping.set()

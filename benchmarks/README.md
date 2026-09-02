@@ -7,6 +7,7 @@ HTTP contracts a Go worker and an API client use; nothing is mocked.
 |---|---|---|
 | `run_native.py` | A Linux host with PostgreSQL 16 (+ `pg_stat_statements`), Redis, and MinIO installed natively | Per-tier JSON: environment facts, per-process peak RSS and CPU, 1 s samples of queue depth and healthy workers, the load generator's client-side view, the PostgreSQL audit of every submitted run, top statements from `pg_stat_statements`, and Redis counters |
 | `run_tiers.ps1` | Docker Desktop via `docker compose --profile load` | The load generator's JSON only (client view plus the PostgreSQL audit) |
+| `run_docker_scale.py` | Docker Desktop | Clean-state escalation with container CPU/RSS/PIDs, PostgreSQL/Redis counters, Prometheus gateway and scheduler measurements, and automatic stop conditions |
 
 `report.py` renders any directory of `run_native.py` results as Markdown. Every
 number in a report is copied from a result file.
@@ -22,8 +23,10 @@ what the sandbox did.
 Committed reports live in `reports/`: `2026-09-01-native-4c16g` (baseline, first
 bottleneck, worker-loss chaos) and `2026-09-02-batch-scheduler` (the scheduler
 redesign measured against it, fault scenarios beyond worker loss, and the hostile
-workloads run for real). Raw output written to `results/` stays ignored by Git so
-that only deliberately published runs are versioned.
+workloads run for real). `2026-09-02-gpu-scale` records the mixed CPU/GPU fleet,
+gateway ceiling, and post-fix worker-loss measurements. Raw output written to
+`results/` stays ignored by Git so that only deliberately published runs are
+versioned.
 
 ## Method
 
@@ -46,8 +49,9 @@ that only deliberately published runs are versioned.
 - The audit also sums `reserved_*` on the workers table after the run. With
   every run terminal the sum must be zero; any other value is a resource
   accounting bug and is reported as "leaked reservations".
-- Worker-loss chaos: `--kill-fraction F --kill-after-seconds T` selects a
-  seeded random F of the fleet T seconds after submission finishes and cancels
+- Worker-loss chaos: `--kill-fraction F --kill-after-seconds T` selects the
+  busiest workers by default (or a seeded random set with `--kill-selection random`)
+  T seconds after submission finishes and cancels
   their streams without completion, cleanup, or further heartbeats. Detection
   is the time from the kill to the attempt being marked `LOST`; recovery is the
   time from the kill to the affected run reaching a terminal state elsewhere.
@@ -73,6 +77,7 @@ scheduler throughput; both values are recorded in the result file.
 ```powershell
 docker compose up --build -d
 ./benchmarks/run_tiers.ps1 -Tiers 100,1000 -Jobs 10000 -Duration 600
+python benchmarks/run_docker_scale.py --tiers 10000,25000,50000,100000 --jobs 10000
 ```
 
 Set `PROJECT_MAX_QUEUED` and `PROJECT_MAX_RUNNING` in `.env` first, otherwise

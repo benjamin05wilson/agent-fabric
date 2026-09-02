@@ -37,6 +37,8 @@ message Register {
   int64 pids = 5;
   repeated string capabilities = 6;
   repeated string sandbox_backends = 7;
+  int64 gpu_count = 8;
+  int64 vram_mb = 9;
 }
 
 message Heartbeat {
@@ -44,6 +46,8 @@ message Heartbeat {
   repeated string active_attempt_ids = 2;
   int64 free_cpu_millis = 3;
   int64 free_memory_mb = 4;
+  int64 free_gpu_count = 5;
+  int64 free_vram_mb = 6;
 }
 
 message LeaseAcknowledgement {
@@ -72,6 +76,9 @@ message LeaseOffer {
   int64 timeout_seconds = 15;
   string network_policy = 16;
   string traceparent = 17;
+  int64 gpu_count = 18;
+  int64 vram_mb = 19;
+  repeated string required_capabilities = 20;
 }
 
 message RunEvent {
@@ -103,4 +110,3 @@ message CleanupConfirmation {
 message CancelRun { string run_id = 1; string attempt_id = 2; }
 message DrainWorker { string reason = 1; }
 message ProtocolError { string code = 1; string message = 2; }
-

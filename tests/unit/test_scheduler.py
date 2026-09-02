@@ -150,3 +150,47 @@ def test_batch_plan_honours_outstanding_offer_limit() -> None:
     runs = [run(tenant, cpu=100, memory=128) for _ in range(10)]
     placements = scheduler._plan(runs, [capacity("a")], {tenant.id: tenant}, {}, limit=3)
     assert len(placements) == 3
+
+
+def test_gpu_capacity_and_capability_are_both_required() -> None:
+    resources = {"cpu_millis": 1000, "memory_mb": 1024, "pids": 16, "gpu": 1, "vram_mb": 8192}
+    cpu_only = capacity("cpu")
+    gpu = Capacity(
+        id="gpu",
+        cpu_millis=8000,
+        memory_mb=16384,
+        pids=512,
+        free_cpu=8000,
+        free_memory=16384,
+        free_pids=512,
+        gpu_count=1,
+        vram_mb=16384,
+        free_gpu=1,
+        free_vram=16384,
+        capabilities=frozenset({"cuda"}),
+    )
+    assert not cpu_only.fits(resources, ["cuda"])
+    assert gpu.fits(resources, ["cuda"])
+    gpu.reserve(resources)
+    assert not gpu.fits(resources, ["cuda"])
+
+
+def test_cpu_jobs_preserve_gpu_workers() -> None:
+    scheduler = Scheduler.__new__(Scheduler)
+    scheduler.deficits = {}
+    scheduler.settings = type(
+        "S",
+        (),
+        {
+            "scheduler_batch_size": 1,
+            "acknowledgement_deadline_seconds": 10,
+            "profile_images": {"python": "python:3.12-slim"},
+        },
+    )()
+    tenant = project()
+    gpu = capacity("gpu")
+    gpu.gpu_count = gpu.free_gpu = 1
+    gpu.vram_mb = gpu.free_vram = 16384
+    gpu.capabilities = frozenset({"cuda"})
+    placement = scheduler._plan([run(tenant)], [gpu, capacity("cpu")], {tenant.id: tenant}, {})
+    assert placement[0].worker_id == "cpu"

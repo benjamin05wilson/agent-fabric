@@ -1,0 +1,52 @@
+{
+  "environment": {
+    "docker_cpus": 24,
+    "docker_memory_bytes": 67125243904,
+    "platform": "Windows Docker Desktop"
+  },
+  "gateway_scale": {
+    "requested_workers": 10000,
+    "registered_workers_at_plateau": 3898,
+    "plateau_observation_seconds": 150,
+    "higher_tiers_skipped": [25000, 50000, 100000],
+    "heartbeat_rate_per_second": 725.735,
+    "gateway_peak_cpu_percent": 112.86,
+    "gateway_peak_rss_mb": 321.3,
+    "gateway_p99_histogram_ceiling_seconds": 1.0,
+    "postgres_peak_cpu_percent": 33.92,
+    "redis_peak_cpu_percent": 10.81,
+    "redis_connected_clients_at_plateau": 3901
+  },
+  "mixed_fleet": {
+    "workers": {"cpu": 90, "gpu": 10, "gpu_each": 1, "vram_mb_each": 8192},
+    "jobs": {"cpu": 400, "gpu": 100, "duration_seconds": "2-4"},
+    "succeeded": 500,
+    "lost_attempts": 0,
+    "retries": 0,
+    "gpu_misplacements": 0,
+    "cpu_jobs_on_gpu": 0,
+    "peak_reserved_gpu": 10,
+    "mean_sampled_reserved_gpu": 7.0,
+    "peak_queue": {"cpu": 54, "gpu": 80},
+    "time_to_start_ms": {
+      "cpu": {"p50": 649.626, "p99": 1221.299},
+      "gpu": {"p50": 14857.449, "p99": 29233.847}
+    },
+    "gateway_latency_seconds": {"p95": 0.086111, "p99": 0.227612},
+    "peak_cpu_percent": {"gateway": 80.88, "postgres": 22.99, "redis": 2.25},
+    "gateway_peak_rss_mb": 80.25
+  },
+  "worker_loss": {
+    "workers": 50,
+    "killed_busiest_workers": 5,
+    "jobs": 200,
+    "in_flight_attempts_at_kill": 200,
+    "lost_attempts": 200,
+    "requeued_and_succeeded": 200,
+    "permanently_lost_runs": 0,
+    "detection_seconds": {"p50": 12.136, "p99": 12.648},
+    "recovery_seconds": {"p50": 24.629, "p99": 27.58},
+    "gateway_p99_seconds": 0.1948,
+    "peak_cpu_percent": {"gateway": 40.36, "postgres": 12.44, "redis": 1.77}
+  }
+}

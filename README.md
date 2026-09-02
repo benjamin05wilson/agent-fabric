@@ -123,6 +123,20 @@ Invoke-RestMethod http://localhost:8000/runs -Method Post `
   -ContentType application/json -Body $body
 ```
 
+GPU jobs request device capacity, VRAM, and the matching worker capability:
+
+```json
+{
+  "profile": "cuda",
+  "required_capabilities": ["cuda"],
+  "resources": {"gpu": 1, "vram_mb": 8192}
+}
+```
+
+GPU workers advertise inventory with `WORKER_GPU_COUNT`, `WORKER_VRAM_MB`, and
+`WORKER_CAPABILITIES=network-disabled,cuda`. The worker passes GPU count to Docker device
+allocation. VRAM is scheduler admission accounting, not a hard per-process VRAM limit.
+
 Run a simulated fleet (the PostgreSQL audit is on because `DATABASE_URL` is set for the service):
 
 ```powershell
@@ -139,7 +153,8 @@ docker compose --profile load run --rm loadgen `
   --kill-fraction 0.1 --kill-after-seconds 60 --kill-selection busiest
 ```
 
-See [`benchmarks/README.md`](benchmarks/README.md) for the native runner that also samples process RSS/CPU and `pg_stat_statements`.
+See [`benchmarks/README.md`](benchmarks/README.md) for native and Docker runners that also
+sample CPU/RSS, PostgreSQL, Redis, gateway, heartbeat, and scheduler behaviour.
 
 ## Real gVisor worker
 

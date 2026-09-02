@@ -40,6 +40,16 @@ class ResourceSpec(BaseModel):
     pids: int = Field(default=128, ge=1, le=512)
     disk_mb: int = Field(default=1024, ge=128, le=20480)
     timeout_seconds: int = Field(default=300, ge=1, le=3600)
+    gpu: int = Field(default=0, ge=0, le=8)
+    vram_mb: int = Field(default=0, ge=0, le=131072)
+
+    @model_validator(mode="after")
+    def gpu_and_vram_are_consistent(self) -> "ResourceSpec":
+        if self.gpu == 0 and self.vram_mb:
+            raise ValueError("vram_mb requires gpu > 0")
+        if self.gpu > 0 and self.vram_mb == 0:
+            raise ValueError("GPU jobs must request vram_mb")
+        return self
 
 
 class RetrySpec(BaseModel):
@@ -59,11 +69,32 @@ class RunCreate(BaseModel):
         min_length=1, max_length=64
     )
     environment: dict[str, str] = Field(default_factory=dict)
-    profile: Literal["python", "node", "go"]
+    profile: Literal["python", "node", "go", "cuda"]
     resources: ResourceSpec = Field(default_factory=ResourceSpec)
+    required_capabilities: list[str] = Field(default_factory=list, max_length=16)
     network: Literal["disabled", "open"] = "disabled"
     priority: int = Field(default=5, ge=0, le=9)
     retry: RetrySpec = Field(default_factory=RetrySpec)
+
+    @field_validator("required_capabilities")
+    @classmethod
+    def bounded_capabilities(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("required_capabilities must be unique")
+        for capability in value:
+            if (
+                not capability
+                or len(capability) > 64
+                or not all(char.isalnum() or char in "-_" for char in capability)
+            ):
+                raise ValueError(f"invalid capability: {capability!r}")
+        return value
+
+    @model_validator(mode="after")
+    def gpu_jobs_require_cuda(self) -> "RunCreate":
+        if self.resources.gpu > 0 and "cuda" not in self.required_capabilities:
+            raise ValueError("GPU jobs must require the cuda capability")
+        return self
 
     @field_validator("environment")
     @classmethod

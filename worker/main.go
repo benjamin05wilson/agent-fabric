@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"runtime"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,7 +41,13 @@ func main() {
 	workspaceRoot := flag.String("workspace-root", envOr("WORKSPACE_ROOT", "/var/lib/agent-fabric/workspaces"), "workspace root")
 	workerID := flag.String("worker-id", envOr("WORKER_ID", defaultWorkerID()), "stable worker identifier")
 	allowUnsafe := flag.Bool("allow-missing-runsc", false, "register without a successful runsc preflight (tests only)")
+	gpuCount := flag.Int64("gpu-count", envInt64("WORKER_GPU_COUNT", 0), "GPUs offered by this worker")
+	vramMB := flag.Int64("vram-mb", envInt64("WORKER_VRAM_MB", 0), "aggregate GPU VRAM offered in MiB")
 	flag.Parse()
+	capabilities := envList("WORKER_CAPABILITIES", []string{"network-disabled"})
+	if *gpuCount > 0 && !contains(capabilities, "cuda") {
+		capabilities = append(capabilities, "cuda")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -52,13 +60,13 @@ func main() {
 		slog.Error("gVisor preflight failed", "error", err)
 		os.Exit(1)
 	}
-	if err := run(ctx, *controlAddress, *workerID, backend); err != nil && ctx.Err() == nil {
+	if err := run(ctx, *controlAddress, *workerID, backend, *gpuCount, *vramMB, capabilities); err != nil && ctx.Err() == nil {
 		slog.Error("worker stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, address, workerID string, backend sandbox.Backend) error {
+func run(ctx context.Context, address, workerID string, backend sandbox.Backend, gpuCount, vramMB int64, capabilities []string) error {
 	connection, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
@@ -77,7 +85,7 @@ func run(ctx context.Context, address, workerID string, backend sandbox.Backend)
 		Payload: &workerv1.WorkerMessage_Register{Register: &workerv1.Register{
 			ProtocolVersion: "v1", WorkerVersion: "0.1.0",
 			CpuMillis: int64(runtime.NumCPU() * 1000), MemoryMb: 16 * 1024, Pids: 4096,
-			Capabilities: []string{"network-disabled"}, SandboxBackends: []string{"gvisor"},
+			Capabilities: capabilities, SandboxBackends: []string{"gvisor"}, GpuCount: gpuCount, VramMb: vramMB,
 		}},
 	}
 	go w.heartbeatLoop(ctx)
@@ -163,7 +171,7 @@ func (w *worker) execute(parent context.Context, lease *workerv1.LeaseOffer) {
 	events := make(chan sandbox.Event, 100)
 	done := make(chan sandbox.Result, 1)
 	go func() {
-		done <- w.backend.Execute(ctx, sandbox.Spec{RunID: lease.RunId, AttemptID: lease.AttemptId, RepositoryURL: lease.RepositoryUrl, RepositoryRef: lease.RepositoryRef, Argv: lease.Argv, Environment: lease.Environment, Image: lease.ImageDigest, CPUMillis: lease.CpuMillis, MemoryMB: lease.MemoryMb, PIDs: lease.Pids, DiskMB: lease.DiskMb, TimeoutSeconds: lease.TimeoutSeconds, NetworkPolicy: lease.NetworkPolicy}, events)
+		done <- w.backend.Execute(ctx, sandbox.Spec{RunID: lease.RunId, AttemptID: lease.AttemptId, RepositoryURL: lease.RepositoryUrl, RepositoryRef: lease.RepositoryRef, Argv: lease.Argv, Environment: lease.Environment, Image: lease.ImageDigest, CPUMillis: lease.CpuMillis, MemoryMB: lease.MemoryMb, PIDs: lease.Pids, GPUCount: lease.GpuCount, VRAMMB: lease.VramMb, DiskMB: lease.DiskMb, TimeoutSeconds: lease.TimeoutSeconds, NetworkPolicy: lease.NetworkPolicy}, events)
 		close(events)
 	}()
 	sequence := uint64(0)
@@ -197,6 +205,42 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envInt64(key string, fallback int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 0 {
+		slog.Error("invalid integer environment value", "key", key, "value", value)
+		os.Exit(2)
+	}
+	return parsed
+}
+
+func envList(key string, fallback []string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	result := []string{}
+	for _, item := range strings.Split(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func contains(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultWorkerID() string {

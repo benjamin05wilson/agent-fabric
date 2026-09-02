@@ -64,6 +64,9 @@ class Measurements:
     submission: dict[str, Any] = field(default_factory=dict)
     chaos: dict[str, Any] = field(default_factory=dict)
     drain: dict[str, Any] = field(default_factory=dict)
+    gpu_leases: int = 0
+    gpu_misplacements: int = 0
+    cpu_jobs_on_gpu: int = 0
     registered_event: asyncio.Event = field(default_factory=asyncio.Event)
 
     def wall_clock(self, perf: float) -> float:
@@ -84,6 +87,11 @@ class Measurements:
             "submission": self.submission,
             "chaos": self.chaos,
             "drain": self.drain,
+            "mixed_fleet": {
+                "gpu_leases": self.gpu_leases,
+                "gpu_misplacements": self.gpu_misplacements,
+                "cpu_jobs_on_gpu": self.cpu_jobs_on_gpu,
+            },
         }
 
 
@@ -98,6 +106,8 @@ class SimulatedWorker:
         max_duration_ms: int,
         failure_rate: float,
         disappear_rate: float,
+        gpu_count: int = 0,
+        vram_mb: int = 0,
     ) -> None:
         self.worker_id = f"sim-{number:08d}"
         self.address = address
@@ -107,6 +117,11 @@ class SimulatedWorker:
         self.max_duration_ms = max_duration_ms
         self.failure_rate = failure_rate
         self.disappear_rate = disappear_rate
+        self.gpu_count = gpu_count
+        self.vram_mb = vram_mb
+        self.capabilities = ["network-disabled", "simulated"]
+        if gpu_count:
+            self.capabilities.append("cuda")
         self.heartbeat_seconds = 5.0
         self.active: set[str] = set()
         self.executions: set[asyncio.Task[None]] = set()
@@ -127,8 +142,10 @@ class SimulatedWorker:
                         cpu_millis=8000,
                         memory_mb=16384,
                         pids=4096,
-                        capabilities=["network-disabled", "simulated"],
+                        capabilities=self.capabilities,
                         sandbox_backends=["gvisor"],
+                        gpu_count=self.gpu_count,
+                        vram_mb=self.vram_mb,
                     ),
                 )
                 self.measurements.registered += 1
@@ -185,6 +202,12 @@ class SimulatedWorker:
     async def execute(self, lease: worker_pb2.LeaseOffer) -> None:
         received = time.perf_counter()
         self.measurements.leases += 1
+        if lease.gpu_count:
+            self.measurements.gpu_leases += 1
+            if self.gpu_count < lease.gpu_count or "cuda" not in self.capabilities:
+                self.measurements.gpu_misplacements += 1
+        elif self.gpu_count:
+            self.measurements.cpu_jobs_on_gpu += 1
         self.active.add(lease.attempt_id)
         await self.outgoing.put(
             worker_pb2.WorkerMessage(
@@ -233,6 +256,8 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
             max_duration_ms=args.max_duration_ms,
             failure_rate=args.failure_rate,
             disappear_rate=args.disappear_rate,
+            gpu_count=args.gpu_count_per_worker if index < args.gpu_workers else 0,
+            vram_mb=args.gpu_vram_mb_per_worker if index < args.gpu_workers else 0,
         )
         for index in range(args.workers)
     ]
@@ -288,7 +313,7 @@ async def submit_jobs(args: argparse.Namespace, measurements: Measurements, pref
     if args.jobs == 0:
         return
     semaphore = asyncio.Semaphore(args.submit_concurrency)
-    body = {
+    body: dict[str, Any] = {
         "repository": {"url": "https://github.com/octocat/Hello-World", "ref": "HEAD"},
         "argv": ["true"],
         "profile": "python",
@@ -316,7 +341,20 @@ async def submit_jobs(args: argparse.Namespace, measurements: Measurements, pref
                                 "Authorization": f"Bearer {args.api_key}",
                                 "Idempotency-Key": f"loadgen-{prefix}-{number}",
                             },
-                            json=body,
+                            json=(
+                                {
+                                    **body,
+                                    "profile": "cuda",
+                                    "required_capabilities": ["cuda"],
+                                    "resources": {
+                                        **body["resources"],
+                                        "gpu": 1,
+                                        "vram_mb": args.gpu_job_vram_mb,
+                                    },
+                                }
+                                if number < round(args.jobs * args.gpu_job_fraction)
+                                else body
+                            ),
                         )
                     except httpx.HTTPError:
                         submission["errors"] += 1
@@ -428,7 +466,8 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
         latency_rows = await connection.fetch(
             "SELECT EXTRACT(EPOCH FROM (started_at - created_at)) * 1000 AS to_start_ms,"
             " EXTRACT(EPOCH FROM (finished_at - created_at)) * 1000 AS end_to_end_ms,"
-            " attempt_count FROM runs WHERE idempotency_key LIKE $1",
+            " attempt_count, coalesce((spec->'resources'->>'gpu')::int,0) AS gpu"
+            " FROM runs WHERE idempotency_key LIKE $1",
             like,
         )
         attempt_states = {
@@ -442,7 +481,9 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
         reservations = await connection.fetchrow(
             "SELECT coalesce(sum(reserved_cpu_millis),0) AS cpu,"
             " coalesce(sum(reserved_memory_mb),0) AS memory,"
-            " coalesce(sum(reserved_pids),0) AS pids, count(*) AS workers FROM workers"
+            " coalesce(sum(reserved_pids),0) AS pids,"
+            " coalesce(sum(reserved_gpu_count),0) AS gpu,"
+            " coalesce(sum(reserved_vram_mb),0) AS vram, count(*) AS workers FROM workers"
         )
         unpublished = await connection.fetchval(
             "SELECT count(*) FROM outbox_events WHERE published_at IS NULL"
@@ -450,7 +491,9 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
         in_flight = await connection.fetchrow(
             "SELECT coalesce(sum((spec->'resources'->>'cpu_millis')::bigint),0) AS cpu,"
             " coalesce(sum((spec->'resources'->>'memory_mb')::bigint),0) AS memory,"
-            " coalesce(sum((spec->'resources'->>'pids')::bigint),0) AS pids"
+            " coalesce(sum((spec->'resources'->>'pids')::bigint),0) AS pids,"
+            " coalesce(sum(coalesce(spec->'resources'->>'gpu','0')::bigint),0) AS gpu,"
+            " coalesce(sum(coalesce(spec->'resources'->>'vram_mb','0')::bigint),0) AS vram"
             " FROM runs WHERE idempotency_key LIKE $1"
             " AND state IN ('LEASED','RUNNING','CANCEL_REQUESTED')",
             like,
@@ -471,6 +514,17 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
                     if row["to_start_ms"] is not None
                 ]
             ),
+            "time_to_start_by_class_ms": {
+                class_name: percentiles(
+                    [
+                        float(row["to_start_ms"])
+                        for row in latency_rows
+                        if row["to_start_ms"] is not None
+                        and (row["gpu"] > 0) == (class_name == "gpu")
+                    ]
+                )
+                for class_name in ("cpu", "gpu")
+            },
             "end_to_end_ms": percentiles(
                 [
                     float(row["end_to_end_ms"])
@@ -485,11 +539,15 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
                 "cpu_millis": int(reservations["cpu"]) if reservations else 0,
                 "memory_mb": int(reservations["memory"]) if reservations else 0,
                 "pids": int(reservations["pids"]) if reservations else 0,
+                "gpu": int(reservations["gpu"]) if reservations else 0,
+                "vram_mb": int(reservations["vram"]) if reservations else 0,
             },
             "in_flight_reservations": {
                 "cpu_millis": int(in_flight["cpu"]) if in_flight else 0,
                 "memory_mb": int(in_flight["memory"]) if in_flight else 0,
                 "pids": int(in_flight["pids"]) if in_flight else 0,
+                "gpu": int(in_flight["gpu"]) if in_flight else 0,
+                "vram_mb": int(in_flight["vram"]) if in_flight else 0,
             },
             "leaked_reservations": {
                 "cpu_millis": int(reservations["cpu"] - in_flight["cpu"])
@@ -499,6 +557,12 @@ async def audit(database_url: str, prefix: str, measurements: Measurements) -> d
                 if reservations and in_flight
                 else 0,
                 "pids": int(reservations["pids"] - in_flight["pids"])
+                if reservations and in_flight
+                else 0,
+                "gpu": int(reservations["gpu"] - in_flight["gpu"])
+                if reservations and in_flight
+                else 0,
+                "vram_mb": int(reservations["vram"] - in_flight["vram"])
                 if reservations and in_flight
                 else 0,
             },
@@ -563,6 +627,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--api-key", default="af_dev_key")
     result.add_argument("--workers", type=int, default=100)
     result.add_argument("--worker-offset", type=int, default=0)
+    result.add_argument("--gpu-workers", type=int, default=0)
+    result.add_argument("--gpu-count-per-worker", type=int, default=1)
+    result.add_argument("--gpu-vram-mb-per-worker", type=int, default=16384)
+    result.add_argument("--gpu-job-fraction", type=float, default=0.0)
+    result.add_argument("--gpu-job-vram-mb", type=int, default=8192)
     result.add_argument("--jobs", type=int, default=1000)
     result.add_argument("--duration", type=int, default=60, help="maximum seconds to wait")
     result.add_argument("--seed", type=int, default=42)
@@ -591,6 +660,10 @@ def run() -> None:
         raise SystemExit("--workers must be between 1 and 1,000,000")
     if args.jobs < 0:
         raise SystemExit("--jobs cannot be negative")
+    if not 0 <= args.gpu_workers <= args.workers:
+        raise SystemExit("--gpu-workers must be between zero and --workers")
+    if not 0 <= args.gpu_job_fraction <= 1:
+        raise SystemExit("--gpu-job-fraction must be between zero and one")
     if not 0 <= args.failure_rate <= 1 or not 0 <= args.disappear_rate <= 1:
         raise SystemExit("failure rates must be between zero and one")
     if not 0 <= args.kill_fraction <= 1:

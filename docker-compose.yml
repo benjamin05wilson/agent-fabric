@@ -9,6 +9,9 @@ x-control-environment: &control-environment
   MINIO_BUCKET: run-logs
   API_KEY: ${API_KEY:-af_dev_key}
   API_KEY_PROJECT: ${API_KEY_PROJECT:-local}
+  PROJECT_MAX_QUEUED: ${PROJECT_MAX_QUEUED:-1000}
+  PROJECT_MAX_RUNNING: ${PROJECT_MAX_RUNNING:-20}
+  SCHEDULER_MAX_OUTSTANDING_OFFERS: ${SCHEDULER_MAX_OUTSTANDING_OFFERS:-100}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
 
 services:
@@ -131,6 +134,9 @@ services:
       CONTROL_PLANE_GRPC: grpc:50051
       WORKER_ID: local-gvisor-1
       WORKSPACE_ROOT: /var/lib/agent-fabric/workspaces
+      WORKER_GPU_COUNT: ${WORKER_GPU_COUNT:-0}
+      WORKER_VRAM_MB: ${WORKER_VRAM_MB:-0}
+      WORKER_CAPABILITIES: ${WORKER_CAPABILITIES:-network-disabled}
     depends_on:
       grpc: {condition: service_started}
     volumes:

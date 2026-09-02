@@ -90,6 +90,9 @@ func (g *GVisor) Execute(parent context.Context, spec Spec, events chan<- Event)
 	if spec.NetworkPolicy == "disabled" {
 		args = append(args, "--network=none")
 	}
+	if spec.GPUCount > 0 {
+		args = append(args, "--gpus="+strconv.FormatInt(spec.GPUCount, 10))
+	}
 	for key, value := range spec.Environment {
 		args = append(args, "--env", key+"="+value)
 	}

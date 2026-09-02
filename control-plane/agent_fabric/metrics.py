@@ -21,3 +21,22 @@ PLACEMENTS = Counter("agent_fabric_placements_total", "Runs leased to workers")
 OUTSTANDING_OFFERS = Gauge(
     "agent_fabric_outstanding_offers", "Lease offers not yet acknowledged by a worker"
 )
+WORKER_REGISTRATIONS = Counter(
+    "agent_fabric_worker_registrations_total", "Worker stream registrations"
+)
+ACTIVE_WORKER_STREAMS = Gauge(
+    "agent_fabric_active_worker_streams", "Currently connected worker streams"
+)
+HEARTBEATS = Counter("agent_fabric_heartbeats_total", "Worker heartbeats processed")
+GATEWAY_MESSAGE_SECONDS = Histogram(
+    "agent_fabric_gateway_message_seconds",
+    "Gateway processing time by worker message kind",
+    ["kind"],
+    buckets=(0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1),
+)
+LEASES_DELIVERED = Counter(
+    "agent_fabric_leases_delivered_total", "Lease offers placed on worker streams"
+)
+LEASE_ACKNOWLEDGEMENTS = Counter(
+    "agent_fabric_lease_acknowledgements_total", "Lease acknowledgements processed", ["accepted"]
+)

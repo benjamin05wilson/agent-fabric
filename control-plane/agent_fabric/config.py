@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # the real limit; see benchmarks/reports).
     scheduler_candidate_limit: int = Field(default=500, ge=1)
     scheduler_batch_size: int = Field(default=200, ge=1)
-    scheduler_max_outstanding_offers: int = Field(default=500, ge=1)
+    scheduler_max_outstanding_offers: int = Field(default=100, ge=1)
     outbox_poll_seconds: float = 0.1
     outbox_batch_size: int = Field(default=500, ge=1)
     auto_create_schema: bool = True
@@ -42,6 +42,7 @@ class Settings(BaseSettings):
         "python": "python:3.12-slim",
         "node": "node:22-slim",
         "go": "golang:1.24-bookworm",
+        "cuda": "nvidia/cuda:13.0.1-runtime-ubuntu24.04",
     }
 
 
