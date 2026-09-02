@@ -16,9 +16,12 @@ Measured on 2 September 2026 using a 24-vCPU, 62.5-GiB Docker Desktop allocation
 | Heartbeat load at 50k | approximately **10,000 heartbeats/s** at a 5 s cadence |
 | Redis restart recovery | **1,000/1,000 jobs succeeded** with 0 retries, loss, stream errors, unpublished events, or reservation leaks |
 | Single-scheduler 50k control | **10,000/10,000 succeeded in 181.254 s; 50.98 placements/s** |
+| Parallel scheduler sweep | **2 replicas: 91.97 jobs/s, +36.9%, correctness-clean; 4 clean at 82.78; 8 failed the zero-retry gate** |
 | 100k connection attempt | **failed** around 43.8k active streams; not claimed |
 
 Full gateway evidence: [`benchmarks/reports/2026-09-02-gateway-sharding`](benchmarks/reports/2026-09-02-gateway-sharding/README.md).
+
+Parallel scheduler evidence: [`benchmarks/reports/2026-09-02-parallel-scheduler`](benchmarks/reports/2026-09-02-parallel-scheduler/README.md). The full 1/2/4/8 scheduling-plane claim is not made: one, two, and four replicas were correctness-clean, throughput peaked at two, and eight produced 62 expired unacknowledged offers.
 
 ## Architecture
 
@@ -104,11 +107,11 @@ The current code also implements **multi-scheduler coordination**:
 - queued-run ownership with `FOR UPDATE SKIP LOCKED`;
 - independently seeded rotating worker keyset windows;
 - exact locked revalidation of CPU, memory, PID, GPU, and VRAM reservations;
-- tenant/global limit rechecks under a short PostgreSQL advisory lock;
+- tenant/global limit rechecks under a non-blocking PostgreSQL transaction advisory-lock attempt;
 - bounded outstanding lease offers and acknowledgement deadlines;
 - Prometheus aggregation across scheduler replicas.
 
-A clean 1/2/4/8 scaling matrix is **not claimed yet**. The experiment exposed outbound-delivery retries in a persistent high-density simulated fleet before a valid replica-speedup comparison was obtained. The implementation and the precise measurement boundary are documented in [`benchmarks/reports/2026-09-02-parallel-scheduler`](benchmarks/reports/2026-09-02-parallel-scheduler/README.md).
+On the 50,000-worker, 10,000-job workload, one, two, and four scheduler replicas were correctness-clean at 67.18, 91.97, and 82.78 jobs/s respectively. Eight replicas regressed to 63.62 jobs/s and produced 62 expired unacknowledged offers. Two replicas therefore improved clean throughput by 36.9%, but the full 1/2/4/8 scaling claim is **not made**.
 
 ## Failure and recovery evidence
 
@@ -223,7 +226,7 @@ Additional documentation:
 
 - The verified 50k fleet is **50,000 simulated workers maintaining real gRPC streams**, not 50,000 physical machines.
 - The highest verified connection tier on the measured Docker Desktop host is **50,000**. The 100k attempt failed and is not claimed.
-- Multi-scheduler coordination is implemented, but a clean 1/2/4/8 speedup matrix has not yet been established.
+- Scheduler replicas are correctness-clean through four processes on the measured 50k workload, but throughput peaks at two; eight replicas regress and produce 62 unacknowledged-offer retries.
 - Public HTTPS Git repositories only; no submodules, LFS, private-repository credentials, or secret injection.
 - Runtime egress is either disabled or open; there is no domain allowlist claim.
 - Workspace disk-byte enforcement needs filesystem quotas. The measured full-disk hostile workload was not contained.

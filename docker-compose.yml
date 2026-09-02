@@ -26,6 +26,7 @@ x-grpc-base: &grpc-base
     api: {condition: service_healthy}
 
 x-scheduler-base: &scheduler-base
+  image: agent-fabric-scheduler
   build:
     context: .
     dockerfile: control-plane/Dockerfile

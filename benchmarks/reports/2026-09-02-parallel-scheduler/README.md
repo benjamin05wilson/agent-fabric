@@ -2,27 +2,31 @@
 
 ## Outcome
 
-Parallel scheduling is implemented, but the 50,000-worker 1/2/4/8 acceptance
-matrix is **not claimed**.
+Parallel scheduling produces a measured clean gain through two replicas, but
+the complete 50,000-worker 1/2/4/8 acceptance matrix is **not claimed** because
+eight replicas fail the zero-retry gate.
 
-The exact 50,000-stream, 10,000-job single-scheduler control completed in
-181.254 seconds at 50.98 measured placements/s with exactly 10,000 successful
-attempts, zero retries, zero lost runs, zero unpublished outbox events, and zero
-reservation leak. This validated rotating bounded worker scans and targeted
-commit-time capacity locks without changing the proven gateway topology.
+The queued-work protocol stopped all schedulers, prefilled 10,000 durable runs,
+then timed only the drain against 50,000 simultaneously durable, heartbeating,
+active gRPC worker streams. The accepted 100-offer bound and rotating
+5,000-worker window were unchanged between phases.
 
-The queued-work protocol then stopped schedulers, prefilled durable runs, and
-timed only the drain. A 1,000-job smoke test recorded 39.073 effective
-placements/s with one scheduler. A later two-scheduler diagnostic completed all
-1,000 runs in 42.781 seconds but needed six retries of unacknowledged offers; no
-run was lost and reservations returned to zero. Wider offer-window experiments
-increased these delivery failures and were reverted.
+| Schedulers | Drain seconds | Effective jobs/s | Attempts | Unacknowledged retries | Duplicate acknowledged executions | Reservation leak |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 148.859 | 67.178 | 10,000 | 0 | 0 | 0 |
+| 2 | 108.734 | 91.968 | 10,000 | 0 | 0 | 0 |
+| 4 | 120.797 | 82.784 | 10,000 | 0 | 0 | 0 |
+| 8 | 157.170 | 63.620 | 10,062 | 62 | 0 | 0 |
 
-Those results are not evidence of scheduler speedup. They show that the safe
-global 100-offer backpressure window and a small population of one-way-stalled
-simulated streams dominate before scheduler replicas can demonstrate scaling.
-The repository therefore keeps the safe bound and does not publish projected
-2/4/8 numbers.
+Two replicas improve clean drain throughput by 36.9% over one. Four replicas
+remain correctness-clean and 23.2% above one replica, but regress from the
+two-replica peak. Eight replicas are both slower than one and generate 62
+expired unacknowledged offers. No phase loses a final run or leaks a CPU,
+memory, PID, GPU, or VRAM reservation.
+
+An interrupted four-replica run was excluded: its timestamps contain a 3h35m
+host suspension, after which two acknowledged leases correctly expired and
+were retried. The table uses a fresh uninterrupted 4/8 rerun.
 
 ## Implemented concurrency model
 
@@ -33,9 +37,11 @@ The repository therefore keeps the safe bound and does not publish projected
 - Equal-capacity workers are shuffled and each batch spreads offers before
   assigning a second offer to one stream; GPU workers remain reserved for GPU
   work when CPU-only capacity exists.
-- The commit phase takes a transaction-scoped PostgreSQL advisory lock, rechecks
+- The commit phase tries a transaction-scoped PostgreSQL advisory lock, rechecks
   the global outstanding-offer ceiling and exact tenant running counts, then
-  locks only selected worker rows.
+  locks only selected worker rows. A losing replica releases its candidate rows
+  immediately instead of waiting while holding them; this removed the measured
+  Run/advisory/Worker acknowledgement deadlock cycle.
 - CPU, memory, PID, GPU, and VRAM reservations are revalidated and mutated on the
   locked rows before a batched flush.
 - The acknowledgement deadline is stamped immediately before persistence, not
@@ -51,13 +57,18 @@ for accelerator jobs. The benchmark audit records total retry attempts, expired
 unacknowledged offers, duplicate acknowledged executions, terminal states,
 unpublished outbox events, and every reservation dimension.
 
+The benchmark now clears Redis delivery state with PostgreSQL workload state
+before attaching a new fleet, fails immediately on any correctness violation,
+and gives all scheduler services one explicit image tag so a sweep cannot mix
+old and new replica images.
+
 Static validation at this revision: Ruff clean, strict mypy clean, 27 unit tests
 passing, and the scheduler-scale Compose profile renders successfully.
 
 ## Next experiment
 
-Before rerunning the full matrix, make outbound readiness observable or isolate
-the high-density Python fleet simulator from the control plane. The acceptance
-gate remains: 50,000 simultaneous durable/live streams, 10,000 jobs per replica
-count, zero duplicate acknowledged executions, zero reservation leaks, and all
-runs terminal. Retry offers must be reported separately rather than hidden.
+The next scheduler change should remove the wasted planning/commit contention
+above two replicas while keeping the exact global offer, tenant, capacity, and
+reservation invariants. Repeat this exact matrix afterward. The acceptance gate
+remains zero retries, zero duplicate acknowledged executions, zero reservation
+leaks, and all 10,000 runs terminal at every replica count.

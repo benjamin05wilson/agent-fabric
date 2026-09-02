@@ -25,6 +25,17 @@ from run_docker_scale import (
 SCHEDULERS = ["scheduler", *(f"scheduler-{index}" for index in range(1, 8))]
 
 
+def reset_delivery_state() -> None:
+    """Remove transient messages before attaching a new benchmark fleet.
+
+    PostgreSQL workload rows and Redis delivery streams form one logical test
+    fixture. Resetting only PostgreSQL lets old offers replay into a new fleet;
+    their now-missing attempt IDs then tear down otherwise healthy streams and
+    contaminate every later replica phase.
+    """
+    command(["docker", "compose", "exec", "-T", "redis", "redis-cli", "FLUSHDB"])
+
+
 def reset_workload(limit: int) -> None:
     sql = (
         "TRUNCATE TABLE run_event_indexes, attempts, runs, outbox_events "
@@ -260,6 +271,24 @@ def run_workload(args: argparse.Namespace, replicas: int) -> dict[str, Any]:
     return report
 
 
+def assert_clean(report: dict[str, Any]) -> None:
+    correctness = report["correctness"]
+    leaks = correctness["reservation_leaks"] or {}
+    failures = {
+        "retry_attempts": correctness["retry_attempts"],
+        "duplicate_executions": correctness["duplicate_executions"],
+        "expired_unacknowledged_offers": correctness["expired_unacknowledged_offers"],
+        "runs_lost": correctness["runs_lost"],
+        "runs_non_terminal": correctness["runs_non_terminal"],
+        "unpublished_outbox_events": correctness["unpublished_outbox_events"],
+        "reservation_leaks": sum(leaks.values()),
+    }
+    dirty = {name: value for name, value in failures.items() if value}
+    if dirty:
+        replicas = report["scheduler_processes"]
+        raise RuntimeError(f"scheduler-{replicas} correctness gate failed: {dirty}")
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--replicas", default="1,2,4,8")
@@ -303,6 +332,7 @@ def main() -> None:
                     f"reusable fleet is too small: durable={durable} active={active}"
                 )
         else:
+            reset_delivery_state()
             command(
                 [
                     "docker",
@@ -321,7 +351,9 @@ def main() -> None:
             )
             names = start_fleet(args)
         for replica_count in replicas:
-            reports.append(run_workload(args, replica_count))
+            report = run_workload(args, replica_count)
+            reports.append(report)
+            assert_clean(report)
     finally:
         for name in names:
             command(["docker", "rm", "-f", name], check=False)

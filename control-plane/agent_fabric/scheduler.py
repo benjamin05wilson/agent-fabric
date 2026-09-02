@@ -180,7 +180,16 @@ class Scheduler:
                 # Planning is deliberately outside this lock. The short commit phase
                 # serializes the two global invariants that SKIP LOCKED cannot protect:
                 # tenant running limits and the outstanding-offer ceiling.
-                await session.execute(select(func.pg_advisory_xact_lock(SCHEDULER_COMMIT_LOCK)))
+                # Never wait for the commit lock while holding SKIP LOCKED candidate
+                # rows. A waiting replica can otherwise close a Run -> advisory ->
+                # Worker -> Run cycle with a concurrent acknowledgement and kill the
+                # worker stream on PostgreSQL's deadlock victim path. Losing replicas
+                # release their candidate rows at transaction exit and retry next poll.
+                acquired = await session.scalar(
+                    select(func.pg_try_advisory_xact_lock(SCHEDULER_COMMIT_LOCK))
+                )
+                if not acquired:
+                    return 0
                 outstanding = await session.scalar(
                     select(func.count())
                     .select_from(Attempt)
