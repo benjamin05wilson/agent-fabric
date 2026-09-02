@@ -1,0 +1,75 @@
+{
+  "affected_runs": 500,
+  "attempts_by_state": {
+    "LOST": 14040,
+    "OFFERED": 500,
+    "SUCCEEDED": 417
+  },
+  "configuration": {
+    "acknowledgement_deadline_seconds": 10,
+    "api": "http://localhost:8000",
+    "control": "localhost:50051",
+    "deadline": 300.0,
+    "disappear_rate": 0.0,
+    "duration": 600,
+    "failure_rate": 0.0,
+    "fault_after": 3.0,
+    "in_flight_timeout": 60.0,
+    "jobs": 2000,
+    "kill_after_seconds": 5.0,
+    "kill_fraction": 0.0,
+    "kill_selection": "random",
+    "label": "",
+    "max_duration_ms": 2000,
+    "min_duration_ms": 500,
+    "min_in_flight": 20,
+    "register_timeout": 30.0,
+    "scenario": "redis-restart",
+    "seed": 42,
+    "submit_concurrency": 100,
+    "worker_offset": 0,
+    "workers": 200
+  },
+  "detection_seconds": 9.361,
+  "drained_before_deadline": false,
+  "end_to_end_seconds": {
+    "p50_s": 2.689,
+    "p99_s": 4.079
+  },
+  "environment": {
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "docker": false,
+    "git_dirty": true,
+    "git_revision": "76840f948830cbf925d4fe5b43febcb21af23fd0",
+    "hostname": "vm",
+    "kernel": "6.18.44-fc-v22",
+    "memory_mb": 16075,
+    "note": "single host; control plane, datastores, and load generator share the CPUs",
+    "postgres": "16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)",
+    "python": "3.11.15",
+    "redis": "7.0.15"
+  },
+  "fault_injected": true,
+  "jobs": 2000,
+  "killed_workers": 0,
+  "lost_attempts": 14040,
+  "lost_attempts_acknowledged": 0,
+  "lost_runs": 0,
+  "notes": [
+    "fault injected 3.00s after submission started with 246 attempt(s) in flight"
+  ],
+  "other_expired_leases": 0,
+  "placement_gap_seconds": 7.699,
+  "placement_gap_started_after_fault_seconds": 285.213,
+  "recovery_seconds": null,
+  "requeued_runs": 500,
+  "runs_by_state": {
+    "LEASED": 500,
+    "QUEUED": 1083,
+    "SUCCEEDED": 417
+  },
+  "scenario": "redis-restart",
+  "total_drain_seconds": 5.625,
+  "unfinished_runs": 1583
+}

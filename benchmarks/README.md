@@ -11,8 +11,19 @@ HTTP contracts a Go worker and an API client use; nothing is mocked.
 `report.py` renders any directory of `run_native.py` results as Markdown. Every
 number in a report is copied from a result file.
 
-Committed reports live in `reports/`. Raw output written to `results/` stays
-ignored by Git so that only deliberately published runs are versioned.
+Two more harnesses feed the reports. `tests/chaos/run_scenarios.py` reuses the
+simulated fleet to inject one fault per run (a killed worker, 10% of the fleet, a
+scheduler restart, a PostgreSQL restart, or a Redis restart) and computes detection,
+requeue, recovery, and loss from PostgreSQL timestamps; `tests/chaos/run_native.sh`
+wraps it with the host-specific restart commands. `tests/security/run_hostile.py`
+submits the hostile workloads through the API to a real `runsc` worker and records
+what the sandbox did.
+
+Committed reports live in `reports/`: `2026-09-01-native-4c16g` (baseline, first
+bottleneck, worker-loss chaos) and `2026-09-02-batch-scheduler` (the scheduler
+redesign measured against it, fault scenarios beyond worker loss, and the hostile
+workloads run for real). Raw output written to `results/` stays ignored by Git so
+that only deliberately published runs are versioned.
 
 ## Method
 

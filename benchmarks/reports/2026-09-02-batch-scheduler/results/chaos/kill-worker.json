@@ -1,0 +1,73 @@
+{
+  "affected_runs": 82,
+  "attempts_by_state": {
+    "LOST": 82,
+    "SUCCEEDED": 2000
+  },
+  "configuration": {
+    "acknowledgement_deadline_seconds": 10,
+    "api": "http://localhost:8000",
+    "control": "localhost:50051",
+    "deadline": 300.0,
+    "disappear_rate": 0.0,
+    "duration": 600,
+    "failure_rate": 0.0,
+    "fault_after": 3.0,
+    "in_flight_timeout": 60.0,
+    "jobs": 2000,
+    "kill_after_seconds": 5.0,
+    "kill_fraction": 0.0,
+    "kill_selection": "random",
+    "label": "",
+    "max_duration_ms": 2000,
+    "min_duration_ms": 500,
+    "min_in_flight": 20,
+    "register_timeout": 30.0,
+    "scenario": "kill-worker",
+    "seed": 42,
+    "submit_concurrency": 100,
+    "worker_offset": 0,
+    "workers": 200
+  },
+  "detection_seconds": 9.938,
+  "drained_before_deadline": true,
+  "end_to_end_seconds": {
+    "p50_s": 7.424,
+    "p99_s": 20.892
+  },
+  "environment": {
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "docker": false,
+    "git_dirty": true,
+    "git_revision": "76840f948830cbf925d4fe5b43febcb21af23fd0",
+    "hostname": "vm",
+    "kernel": "6.18.44-fc-v22",
+    "memory_mb": 16075,
+    "note": "single host; control plane, datastores, and load generator share the CPUs",
+    "postgres": "16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)",
+    "python": "3.11.15",
+    "redis": "7.0.15"
+  },
+  "fault_injected": true,
+  "jobs": 2000,
+  "killed_workers": 1,
+  "lost_attempts": 82,
+  "lost_attempts_acknowledged": 35,
+  "lost_runs": 0,
+  "notes": [
+    "fault injected 3.00s after submission started with 230 attempt(s) in flight",
+    "killed 1 worker(s) holding 70 active attempt(s)"
+  ],
+  "other_expired_leases": 0,
+  "placement_gap_seconds": 3.164,
+  "placement_gap_started_after_fault_seconds": -0.248,
+  "recovery_seconds": 22.291,
+  "requeued_runs": 82,
+  "runs_by_state": {
+    "SUCCEEDED": 2000
+  },
+  "scenario": "kill-worker",
+  "total_drain_seconds": 24.943,
+  "unfinished_runs": 0
+}

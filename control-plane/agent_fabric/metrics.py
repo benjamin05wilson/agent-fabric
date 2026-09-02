@@ -17,3 +17,7 @@ SCHEDULING_SECONDS = Histogram(
 LEASE_EXPIRATIONS = Counter(
     "agent_fabric_lease_expirations_total", "Expired leases", ["acknowledged", "outcome"]
 )
+PLACEMENTS = Counter("agent_fabric_placements_total", "Runs leased to workers")
+OUTSTANDING_OFFERS = Gauge(
+    "agent_fabric_outstanding_offers", "Lease offers not yet acknowledged by a worker"
+)

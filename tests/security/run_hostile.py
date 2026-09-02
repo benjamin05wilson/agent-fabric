@@ -32,6 +32,14 @@ WORKLOADS = Path(__file__).resolve().parent / "workloads"
 # expected: acceptable terminal states; a run is contained when its state is listed here,
 # the worker is still healthy afterwards, and cleanup was confirmed by the worker.
 SCENARIOS: dict[str, dict[str, Any]] = {
+    "escape_probe": {
+        "resources": {"memory_mb": 128, "cpu_millis": 500, "pids": 16, "timeout_seconds": 60},
+        "expected": {"SUCCEEDED"},
+        "reason": (
+            "reports uid, capabilities, no-new-privs, writable paths, devices, and the"
+            " gVisor kernel string from inside the sandbox; the log tail is the evidence"
+        ),
+    },
     "memory_bomb": {
         "resources": {"memory_mb": 128, "cpu_millis": 500, "pids": 32, "timeout_seconds": 60},
         "expected": {"FAILED"},
@@ -40,7 +48,11 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     "fork_bomb": {
         "resources": {"memory_mb": 256, "cpu_millis": 500, "pids": 32, "timeout_seconds": 60},
         "expected": {"FAILED", "TIMED_OUT"},
-        "reason": "pids limit stops fork(); the loop either dies or hits the timeout",
+        "reason": (
+            "pids limit stops fork(); under runsc the whole sandbox is terminated (exit 2, no"
+            " EAGAIN) once the cgroup limit is reached, so FAILED with no output is the"
+            " contained outcome"
+        ),
     },
     "infinite_loop": {
         "resources": {"memory_mb": 128, "cpu_millis": 500, "pids": 16, "timeout_seconds": 10},
@@ -54,6 +66,11 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             "workspace quota is not hard-enforced (see README limitations); this records"
             " how much was written before the timeout or an I/O error"
         ),
+    },
+    "tmp_exhaustion": {
+        "resources": {"memory_mb": 256, "cpu_millis": 500, "pids": 16, "timeout_seconds": 60},
+        "expected": {"FAILED"},
+        "reason": "/tmp is a 64 MiB tmpfs, so the writer must hit ENOSPC well before the timeout",
     },
     "forbidden_network": {
         "resources": {"memory_mb": 128, "cpu_millis": 500, "pids": 16, "timeout_seconds": 30},

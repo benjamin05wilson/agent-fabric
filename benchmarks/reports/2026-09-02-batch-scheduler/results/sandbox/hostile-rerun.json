@@ -1,0 +1,114 @@
+{
+  "scenarios": {
+    "forbidden_network": {
+      "contained": true,
+      "elapsed_seconds": 4.0,
+      "expectation": "--network=none makes the connection fail immediately",
+      "expected_states": [
+        "FAILED"
+      ],
+      "failure": {
+        "code": "NON_ZERO_EXIT",
+        "message": "exit status 4"
+      },
+      "log_tail": [
+        "Cloning into '/var/lib/agent-fabric/hostile-workspaces/agent-fabric-2932564220'...\n",
+        "blocked: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>\n",
+        "raw socket blocked: [Errno 101] Network is unreachable\n"
+      ],
+      "result": {
+        "exit_code": 4
+      },
+      "run_id": "0d9d6b78-a3fe-411b-ab73-1f2c36cc45d9",
+      "state": "FAILED",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "tmp_exhaustion": {
+      "contained": true,
+      "elapsed_seconds": 2.0,
+      "expectation": "/tmp is a 64 MiB tmpfs, so the writer must hit ENOSPC well before the timeout",
+      "expected_states": [
+        "FAILED"
+      ],
+      "failure": {
+        "code": "NON_ZERO_EXIT",
+        "message": "exit status 1"
+      },
+      "log_tail": [
+        "wrote 32 MiB to /tmp\n",
+        "wrote 48 MiB to /tmp\n",
+        "Traceback (most recent call last):\n  File \"<string>\", line 5, in <module>\n",
+        "wrote 64 MiB to /tmp\n",
+        "OSError: [Errno 28] No space left on device\n"
+      ],
+      "result": {
+        "exit_code": 1
+      },
+      "run_id": "1aafb7c8-8e3d-41e1-99a2-8320d74f56ef",
+      "state": "FAILED",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    }
+  },
+  "workers_after": {
+    "hostile-gvisor-1": {
+      "capabilities": [
+        "network-disabled"
+      ],
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_mb": 16384,
+        "pids": 4096
+      },
+      "draining": false,
+      "healthy": true,
+      "id": "hostile-gvisor-1",
+      "last_seen_at": "2026-09-02T00:53:17.846713Z",
+      "reserved": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      },
+      "sandbox_backends": [
+        "gvisor"
+      ],
+      "version": "0.1.0"
+    }
+  },
+  "workers_before": {
+    "hostile-gvisor-1": {
+      "capabilities": [
+        "network-disabled"
+      ],
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_mb": 16384,
+        "pids": 4096
+      },
+      "draining": false,
+      "healthy": true,
+      "id": "hostile-gvisor-1",
+      "last_seen_at": "2026-09-02T00:53:12.894858Z",
+      "reserved": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      },
+      "sandbox_backends": [
+        "gvisor"
+      ],
+      "version": "0.1.0"
+    }
+  }
+}

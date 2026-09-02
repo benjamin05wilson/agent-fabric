@@ -301,6 +301,8 @@ def measure_tier(
             row["queue_depth"] = scheduler_metrics.get("agent_fabric_queue_depth")
             row["healthy_workers"] = scheduler_metrics.get("agent_fabric_healthy_workers")
             row["scheduling_count"] = scheduler_metrics.get("agent_fabric_scheduling_seconds_count")
+            row["placements"] = scheduler_metrics.get("agent_fabric_placements_total")
+            row["outstanding_offers"] = scheduler_metrics.get("agent_fabric_outstanding_offers")
             row["scheduling_sum"] = scheduler_metrics.get("agent_fabric_scheduling_seconds_sum")
             row["outbox_lag_seconds"] = scrape(OUTBOX_METRICS).get(
                 "agent_fabric_outbox_lag_seconds"

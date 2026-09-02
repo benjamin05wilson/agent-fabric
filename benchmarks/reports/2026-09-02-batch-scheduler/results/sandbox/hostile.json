@@ -1,0 +1,224 @@
+{
+  "scenarios": {
+    "disk_exhaustion": {
+      "contained": false,
+      "elapsed_seconds": 56.2,
+      "expectation": "workspace quota is not hard-enforced (see README limitations); this records how much was written before the timeout or an I/O error",
+      "expected_states": [
+        "FAILED",
+        "TIMED_OUT"
+      ],
+      "failure": {
+        "code": "WORKER_LOST",
+        "message": "worker heartbeat stopped during uncertain execution"
+      },
+      "log_tail": [
+        "wrote 11520 MiB to workspace\n",
+        "wrote 11776 MiB to workspace\n",
+        "wrote 12032 MiB to workspace\n",
+        "wrote 12288 MiB to workspace\n",
+        "wrote 12544 MiB to workspace\n"
+      ],
+      "result": null,
+      "run_id": "13344805-16f2-4eee-9848-d708255e802f",
+      "state": "LOST",
+      "worker_healthy_after": false,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "escape_probe": {
+      "contained": true,
+      "elapsed_seconds": 2.0,
+      "expectation": "reports uid, capabilities, no-new-privs, writable paths, devices, and the gVisor kernel string from inside the sandbox; the log tail is the evidence",
+      "expected_states": [
+        "SUCCEEDED"
+      ],
+      "failure": null,
+      "log_tail": [
+        "Cloning into '/var/lib/agent-fabric/hostile-workspaces/agent-fabric-83514561'...\n",
+        "umps(report, indent=2, sort_keys=True))\",\n  \"uid\": 65532,\n  \"write:/etc/probe\": \"denied (13)\",\n  \"write:/probe\": \"denied (13)\",\n  \"write:/usr/probe\": \"denied (13)\",\n  \"write:/workspace\": \"writable\"\n}\n"
+      ],
+      "result": {
+        "exit_code": 0
+      },
+      "run_id": "c6deff87-85e4-4777-8a3d-4e59b31fdfca",
+      "state": "SUCCEEDED",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "forbidden_network": {
+      "contained": false,
+      "elapsed_seconds": 150.5,
+      "expectation": "--network=none makes the connection fail immediately",
+      "expected_states": [
+        "FAILED"
+      ],
+      "failure": null,
+      "log_tail": [],
+      "result": null,
+      "run_id": "0fe23e0f-b785-4cdb-9ea0-b9f6bbaa6218",
+      "state": "QUEUED",
+      "worker_healthy_after": null,
+      "worker_id": null,
+      "worker_reserved_after": null
+    },
+    "fork_bomb": {
+      "contained": true,
+      "elapsed_seconds": 4.0,
+      "expectation": "pids limit stops fork(); under runsc the whole sandbox is terminated (exit 2, no EAGAIN) once the cgroup limit is reached, so FAILED with no output is the contained outcome",
+      "expected_states": [
+        "FAILED",
+        "TIMED_OUT"
+      ],
+      "failure": {
+        "code": "NON_ZERO_EXIT",
+        "message": "exit status 2"
+      },
+      "log_tail": [
+        "Cloning into '/var/lib/agent-fabric/hostile-workspaces/agent-fabric-2665233972'...\n"
+      ],
+      "result": {
+        "exit_code": 2
+      },
+      "run_id": "d79a5735-f960-4619-9d24-263efda99da9",
+      "state": "FAILED",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "infinite_loop": {
+      "contained": true,
+      "elapsed_seconds": 12.1,
+      "expectation": "wall-clock timeout terminates the container",
+      "expected_states": [
+        "TIMED_OUT"
+      ],
+      "failure": {
+        "code": "TIMEOUT",
+        "message": "wall-clock timeout exceeded"
+      },
+      "log_tail": [
+        "Cloning into '/var/lib/agent-fabric/hostile-workspaces/agent-fabric-2510016933'...\n"
+      ],
+      "result": {
+        "exit_code": -1
+      },
+      "run_id": "a67afaf4-fc94-4f0e-b3b3-8e0bcb27574d",
+      "state": "TIMED_OUT",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "memory_bomb": {
+      "contained": true,
+      "elapsed_seconds": 2.0,
+      "expectation": "cgroup memory limit kills the process; exit code is non-zero",
+      "expected_states": [
+        "FAILED"
+      ],
+      "failure": {
+        "code": "NON_ZERO_EXIT",
+        "message": "exit status 137"
+      },
+      "log_tail": [
+        "Cloning into '/var/lib/agent-fabric/hostile-workspaces/agent-fabric-2029577456'...\n",
+        "allocated 64 MiB\n"
+      ],
+      "result": {
+        "exit_code": 137
+      },
+      "run_id": "bb5ecdef-7cf3-43e6-b2e5-e3d8856077d2",
+      "state": "FAILED",
+      "worker_healthy_after": true,
+      "worker_id": "hostile-gvisor-1",
+      "worker_reserved_after": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      }
+    },
+    "tmp_exhaustion": {
+      "contained": false,
+      "elapsed_seconds": 180.6,
+      "expectation": "/tmp is a 64 MiB tmpfs, so the writer must hit ENOSPC well before the timeout",
+      "expected_states": [
+        "FAILED"
+      ],
+      "failure": null,
+      "log_tail": [],
+      "result": null,
+      "run_id": "648d98e5-8caa-4a9c-aae7-981f82221070",
+      "state": "QUEUED",
+      "worker_healthy_after": null,
+      "worker_id": null,
+      "worker_reserved_after": null
+    }
+  },
+  "workers_after": {
+    "hostile-gvisor-1": {
+      "capabilities": [
+        "network-disabled"
+      ],
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_mb": 16384,
+        "pids": 4096
+      },
+      "draining": false,
+      "healthy": false,
+      "id": "hostile-gvisor-1",
+      "last_seen_at": "2026-09-02T00:45:47.460941Z",
+      "reserved": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      },
+      "sandbox_backends": [
+        "gvisor"
+      ],
+      "version": "0.1.0"
+    }
+  },
+  "workers_before": {
+    "hostile-gvisor-1": {
+      "capabilities": [
+        "network-disabled"
+      ],
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_mb": 16384,
+        "pids": 4096
+      },
+      "draining": false,
+      "healthy": true,
+      "id": "hostile-gvisor-1",
+      "last_seen_at": "2026-09-02T00:44:46.321042Z",
+      "reserved": {
+        "cpu_millis": 0,
+        "memory_mb": 0,
+        "pids": 0
+      },
+      "sandbox_backends": [
+        "gvisor"
+      ],
+      "version": "0.1.0"
+    }
+  }
+}

@@ -83,7 +83,11 @@ def scaling_table(results: list[dict[str, Any]]) -> list[str]:
         metrics = item.get("scheduler_metrics") or {}
         processes = item.get("processes") or {}
         drain_seconds = drain.get("seconds_after_start")
-        placements = metrics.get("agent_fabric_scheduling_seconds_count")
+        # The batch scheduler places many runs per iteration; prefer its placement counter
+        # and fall back to iteration count for results recorded by the serial scheduler.
+        placements = metrics.get("agent_fabric_placements_total") or metrics.get(
+            "agent_fabric_scheduling_seconds_count"
+        )
         placements_per_second = placements / drain_seconds if placements and drain_seconds else None
         lines.append(
             "| {label} | {tier} | {accepted} | {backpressure} | {registered} | {drained} |"
@@ -222,7 +226,8 @@ def timeline_section(results: list[dict[str, Any]]) -> list[str]:
         for row in samples[::10] + ([samples[-1]] if len(samples) % 10 != 1 else []):
             lines.append(
                 f"| {row.get('t')} | {fmt(row.get('queue_depth'), 0)} |"
-                f" {fmt(row.get('healthy_workers'), 0)} | {fmt(row.get('scheduling_count'), 0)} |"
+                f" {fmt(row.get('healthy_workers'), 0)} |"
+                f" {fmt(row.get('placements', row.get('scheduling_count')), 0)} |"
                 f" {fmt(row.get('outbox_lag_seconds'), 1)} |"
                 f" {fmt(row.get('scheduler_rss_mb'), 0)} | {fmt(row.get('grpc_rss_mb'), 0)} |"
             )
