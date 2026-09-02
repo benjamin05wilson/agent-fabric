@@ -1,0 +1,99 @@
+{
+  "audit": {
+    "attempt_states": {
+      "LOST": 4666,
+      "SUCCEEDED": 10000
+    },
+    "end_to_end_ms": {
+      "count": 10000,
+      "max": 247879.605,
+      "mean": 114813.815,
+      "p50": 114189.11,
+      "p95": 208201.768,
+      "p99": 217518.57
+    },
+    "in_flight_reservations": {
+      "cpu_millis": 0,
+      "memory_mb": 0,
+      "pids": 0
+    },
+    "leaked_reservations": {
+      "cpu_millis": 0,
+      "memory_mb": 0,
+      "pids": 0
+    },
+    "reserved_after_run": {
+      "cpu_millis": 0,
+      "memory_mb": 0,
+      "pids": 0
+    },
+    "run_states": {
+      "SUCCEEDED": 10000
+    },
+    "runs_lost": 0,
+    "runs_non_terminal": 0,
+    "runs_total": 10000,
+    "runs_with_retries": 2557,
+    "time_to_start_ms": {
+      "count": 10000,
+      "max": 247865.268,
+      "mean": 113856.553,
+      "p50": 113598.946,
+      "p95": 207249.159,
+      "p99": 217115.989
+    },
+    "unpublished_outbox_events": 0,
+    "workers_in_table": 1000
+  },
+  "benchmark_id": "11ce17f8fefb43c49e7a66d20589f525",
+  "configuration": {
+    "api": "http://localhost:8000",
+    "control": "localhost:50051",
+    "disappear_rate": 0.0,
+    "duration": 600,
+    "failure_rate": 0.0,
+    "jobs": 10000,
+    "kill_after_seconds": 5.0,
+    "kill_fraction": 0.0,
+    "kill_selection": "random",
+    "label": "batch",
+    "max_duration_ms": 500,
+    "min_duration_ms": 50,
+    "register_timeout": 300.0,
+    "seed": 42,
+    "submit_concurrency": 100,
+    "worker_offset": 0,
+    "workers": 1000
+  },
+  "results": {
+    "chaos": {},
+    "completed": 14298,
+    "completion_throughput_per_second": 50.39,
+    "drain": {
+      "drained": true,
+      "seconds_after_start": 283.672
+    },
+    "elapsed_seconds": 283.748,
+    "lease_latency_ms": {
+      "count": 14298,
+      "max": 238389.767,
+      "mean": 103727.586,
+      "p50": 103890.108,
+      "p95": 195933.588,
+      "p99": 207113.198
+    },
+    "leases": 14298,
+    "registered_after_seconds": 0.195,
+    "registered_workers": 1000,
+    "stream_errors": 0,
+    "submission": {
+      "accepted": 10000,
+      "attempted": 10000,
+      "backpressure_429": 0,
+      "errors": 0,
+      "per_second": 149.323,
+      "seconds": 66.969
+    }
+  },
+  "started_at": "2026-09-02T00:04:47.898043+00:00"
+}
