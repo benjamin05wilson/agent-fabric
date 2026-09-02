@@ -142,6 +142,13 @@ func (w *worker) heartbeatLoop(ctx context.Context) {
 }
 
 func (w *worker) execute(parent context.Context, lease *workerv1.LeaseOffer) {
+	if lease.ExpiresUnixMillis > 0 && lease.ExpiresUnixMillis < time.Now().UnixMilli() {
+		// The control plane has already reclaimed this offer; running it would execute the
+		// run twice once it is leased elsewhere.
+		slog.Warn("lease expired before receipt", "attempt_id", lease.AttemptId)
+		w.outgoing <- &workerv1.WorkerMessage{WorkerId: w.id, Payload: &workerv1.WorkerMessage_Acknowledgement{Acknowledgement: &workerv1.LeaseAcknowledgement{RunId: lease.RunId, AttemptId: lease.AttemptId, LeaseToken: lease.LeaseToken, Accepted: false, Reason: "lease expired before receipt"}}}
+		return
+	}
 	ctx, cancel := context.WithCancel(parent)
 	w.mu.Lock()
 	if _, exists := w.active[lease.AttemptId]; exists {

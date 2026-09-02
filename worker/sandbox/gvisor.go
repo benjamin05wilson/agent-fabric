@@ -16,6 +16,13 @@ import (
 	"time"
 )
 
+// gVisor's Sentry and gofer run inside the container's pids cgroup, so the limit passed to
+// Docker must leave room for them: with --pids-limit=16 every sandbox failed to start
+// ("waiting for sandbox to start: EOF", exit 125) while 32 and 64 worked on the benchmark
+// host. The worker adds this measured overhead to the lease's PID budget so the number the
+// workload sees is the number the API promised.
+const gvisorPIDOverhead = 48
+
 type GVisor struct {
 	WorkspaceRoot string
 	mu            sync.Mutex
@@ -75,7 +82,7 @@ func (g *GVisor) Execute(parent context.Context, spec Spec, events chan<- Event)
 		"--user=65532:65532",
 		"--cpus=" + strconv.FormatFloat(float64(spec.CPUMillis)/1000, 'f', 3, 64),
 		"--memory=" + strconv.FormatInt(spec.MemoryMB, 10) + "m",
-		"--pids-limit=" + strconv.FormatInt(spec.PIDs, 10),
+		"--pids-limit=" + strconv.FormatInt(spec.PIDs+gvisorPIDOverhead, 10),
 		"--tmpfs=/tmp:rw,noexec,nosuid,size=64m",
 		"--mount=type=bind,src=" + workspace + ",dst=/workspace",
 		"--workdir=/workspace",
@@ -118,6 +125,12 @@ func (g *GVisor) Execute(parent context.Context, spec Spec, events chan<- Event)
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
+		if exitErr.ExitCode() == 125 {
+			// Docker's own exit status: the daemon or runtime refused to start the
+			// container, so the workload never ran. Report it as a sandbox failure, not
+			// as the workload's exit code.
+			return Result{ExitCode: exitErr.ExitCode(), State: "FAILED", ReasonCode: "SANDBOX_START", Message: err.Error()}
+		}
 		return Result{ExitCode: exitErr.ExitCode(), State: "FAILED", ReasonCode: "NON_ZERO_EXIT", Message: err.Error()}
 	}
 	return Result{ExitCode: -1, State: "FAILED", ReasonCode: "EXECUTION_ERROR", Message: err.Error()}
@@ -201,5 +214,27 @@ func EnsureWorkspaceRoot(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.MkdirAll(absolute, 0o700)
+	if err := os.MkdirAll(absolute, 0o700); err != nil {
+		return err
+	}
+	return purgeStaleWorkspaces(absolute)
+}
+
+// purgeStaleWorkspaces removes per-attempt directories left behind by a previous worker
+// process that exited without running its deferred cleanup. A hostile disk-exhaustion
+// run measured a 28 GB workspace surviving a worker crash until the host was manually
+// cleaned; every directory here belongs to an attempt whose lease has long expired.
+func purgeStaleWorkspaces(root string) error {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "agent-fabric-") {
+			if err := os.RemoveAll(filepath.Join(root, entry.Name())); err != nil {
+				return fmt.Errorf("purge stale workspace %s: %w", entry.Name(), err)
+			}
+		}
+	}
+	return nil
 }
