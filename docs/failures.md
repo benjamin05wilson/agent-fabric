@@ -9,5 +9,5 @@ Delivery is at least once. Effects are not claimed to be exactly once.
 - PostgreSQL is authoritative. Redis loss delays delivery, while polling and outbox reconciliation recover durable queued work.
 - Cancellation of queued work is immediate. Running work becomes `CANCEL_REQUESTED` until the worker confirms termination or its lease expires.
 
-Required chaos measurements include detection delay, lease-expiry delay, requeue latency, recovery time, tail latency, and lost-job count.
+Required chaos measurements include detection delay, lease-expiry delay, requeue latency, recovery time, tail latency, and lost-job count. `agent-fabric-loadgen --kill-fraction` produces them from PostgreSQL timestamps; measured values live in `benchmarks/reports`.
 

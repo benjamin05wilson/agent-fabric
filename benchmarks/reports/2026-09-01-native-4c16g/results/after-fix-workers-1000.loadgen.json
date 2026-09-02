@@ -1,0 +1,105 @@
+{
+  "audit": {
+    "attempt_states": {
+      "LOST": 185,
+      "OFFERED": 118,
+      "RUNNING": 1,
+      "SUCCEEDED": 9443
+    },
+    "end_to_end_ms": {
+      "count": 9443,
+      "max": 601885.777,
+      "mean": 309495.932,
+      "p50": 306506.699,
+      "p95": 571676.159,
+      "p99": 593477.115
+    },
+    "leaked_reservations": {
+      "cpu_millis": 0,
+      "memory_mb": 0,
+      "pids": 0
+    },
+    "run_states": {
+      "LEASED": 118,
+      "QUEUED": 438,
+      "RUNNING": 1,
+      "SUCCEEDED": 9443
+    },
+    "runs_lost": 0,
+    "runs_non_terminal": 557,
+    "runs_total": 10000,
+    "runs_with_retries": 103,
+    "time_to_start_ms": {
+      "count": 9444,
+      "max": 601891.033,
+      "mean": 308969.949,
+      "p50": 306118.361,
+      "p95": 571317.311,
+      "p99": 593419.477
+    },
+    "unpublished_outbox_events": 0,
+    "workers_in_table": 1000,
+    "reserved_after_run": {
+      "cpu_millis": 11900,
+      "memory_mb": 15232,
+      "pids": 1904
+    },
+    "in_flight_reservations": {
+      "cpu_millis": 11900,
+      "memory_mb": 15232,
+      "pids": 1904
+    },
+    "in_flight_reservations_derived_from_run_states": true
+  },
+  "benchmark_id": "f310b9a1820b44e4bb2d6b6c192610ef",
+  "configuration": {
+    "api": "http://localhost:8000",
+    "control": "localhost:50051",
+    "disappear_rate": 0.0,
+    "duration": 600,
+    "failure_rate": 0.0,
+    "jobs": 10000,
+    "kill_after_seconds": 5.0,
+    "kill_fraction": 0.0,
+    "label": "after-fix",
+    "max_duration_ms": 500,
+    "min_duration_ms": 50,
+    "register_timeout": 120.0,
+    "seed": 42,
+    "submit_concurrency": 100,
+    "worker_offset": 0,
+    "workers": 1000
+  },
+  "results": {
+    "chaos": {},
+    "completed": 9663,
+    "completion_throughput_per_second": 14.017,
+    "drain": {
+      "drained": false,
+      "non_terminal_runs": 567,
+      "seconds_after_start": 682.647
+    },
+    "elapsed_seconds": 689.357,
+    "lease_latency_ms": {
+      "count": 9663,
+      "max": 601498.887,
+      "mean": 303855.467,
+      "p50": 301076.111,
+      "p95": 570332.17,
+      "p99": 596356.376
+    },
+    "leases": 9663,
+    "registered_after_seconds": 0.252,
+    "registered_workers": 1000,
+    "stream_errors": 0,
+    "submission": {
+      "accepted": 10000,
+      "attempted": 10000,
+      "backpressure_429": 0,
+      "errors": 0,
+      "per_second": 121.377,
+      "seconds": 82.388
+    }
+  },
+  "started_at": "2026-09-01T21:52:42.217885+00:00"
+}
