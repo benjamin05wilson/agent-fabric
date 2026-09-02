@@ -66,9 +66,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
         self.settings = get_settings()
         self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
         self.gateway_id = self.settings.gateway_id
-        self.connections: dict[
-            str, asyncio.Queue[worker_pb2.ControlMessage | None]
-        ] = {}
+        self.connections: dict[str, asyncio.Queue[worker_pb2.ControlMessage | None]] = {}
         self.pending_heartbeats: dict[str, tuple[datetime, list[uuid.UUID], list[str]]] = {}
         self.event_queue: asyncio.Queue[tuple[str, worker_pb2.RunEvent]] = asyncio.Queue(
             maxsize=self.settings.gateway_event_queue_size
@@ -278,9 +276,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
                 raise
 
         while True:
-            pending = await self.redis.xreadgroup(
-                group, self.gateway_id, {stream: "0"}, count=100
-            )
+            pending = await self.redis.xreadgroup(group, self.gateway_id, {stream: "0"}, count=100)
             has_pending = any(entries for _, entries in pending)
             messages = (
                 pending
@@ -425,9 +421,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
 
     async def close(self) -> None:
         background = [
-            task
-            for task in (self.heartbeat_flusher, self.outbound_reader)
-            if task is not None
+            task for task in (self.heartbeat_flusher, self.outbound_reader) if task is not None
         ]
         for task in background:
             task.cancel()
@@ -581,6 +575,7 @@ class WorkerControlService(worker_pb2_grpc.WorkerControlServicer):
             if attempt:
                 attempt.cleanup_confirmed = message.successful
                 attempt.cleanup_message = message.message
+
 
 async def serve() -> None:
     service = WorkerControlService()

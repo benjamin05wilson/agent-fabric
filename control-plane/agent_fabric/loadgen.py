@@ -322,9 +322,7 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
     return result
 
 
-async def wait_for_registration(
-    args: argparse.Namespace, measurements: Measurements
-) -> bool:
+async def wait_for_registration(args: argparse.Namespace, measurements: Measurements) -> bool:
     deadline = time.perf_counter() + args.register_timeout
     if args.workers:
         try:

@@ -207,9 +207,7 @@ class Scheduler:
                     )
                     for placement in placements:
                         placement.expires = expires
-                        placement.payload["expires_unix_millis"] = int(
-                            expires.timestamp() * 1000
-                        )
+                        placement.payload["expires_unix_millis"] = int(expires.timestamp() * 1000)
                     await self._persist(session, placements)
             return len(placements)
 
@@ -234,11 +232,7 @@ class Scheduler:
         if self.worker_cursor is None:
             offset = secrets.randbelow(healthy) if healthy else 0
             self.worker_cursor = await session.scalar(
-                select(Worker.id)
-                .where(*worker_filter)
-                .order_by(Worker.id)
-                .offset(offset)
-                .limit(1)
+                select(Worker.id).where(*worker_filter).order_by(Worker.id).offset(offset).limit(1)
             )
 
         columns = (
@@ -273,10 +267,7 @@ class Scheduler:
             rows.extend(
                 (
                     await session.execute(
-                        select(*columns)
-                        .where(*worker_filter)
-                        .order_by(Worker.id)
-                        .limit(remaining)
+                        select(*columns).where(*worker_filter).order_by(Worker.id).limit(remaining)
                     )
                 ).all()
             )
