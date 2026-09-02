@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     acknowledgement_deadline_seconds: int = Field(default=10, ge=1)
     max_log_bytes: int = 10 * 1024 * 1024
     scheduler_poll_seconds: float = 0.5
+    # Batch placement: runs read per iteration, placements written per iteration, and the
+    # cap on unacknowledged offers in flight (the gateway's acknowledgement throughput is
+    # the real limit; see benchmarks/reports).
+    scheduler_candidate_limit: int = Field(default=500, ge=1)
+    scheduler_batch_size: int = Field(default=200, ge=1)
+    scheduler_max_outstanding_offers: int = Field(default=500, ge=1)
     outbox_poll_seconds: float = 0.1
     outbox_batch_size: int = Field(default=500, ge=1)
     auto_create_schema: bool = True
