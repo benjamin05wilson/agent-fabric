@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars (git-ignored) and adjust.
+
+aws_region  = "eu-west-2"
+project     = "agent-fabric"
+environment = "dev"
+
+# Your egress IP(s). Leave empty to make the API reachable only from inside the VPC.
+api_allowed_cidrs = ["203.0.113.4/32"]
+
+control_plane_public_ip = true
+
+control_plane_instance_type = "t4g.small"
+worker_instance_type        = "t3.small"
+worker_min_size             = 2
+worker_desired_capacity     = 2
+worker_max_size             = 3
+
+image_tag = "latest"
+
+db_instance_class = "db.t4g.micro"
+redis_node_type   = "cache.t4g.micro"
+
+log_retention_days       = 14
+run_logs_expiration_days = 30
+
+# Pin a dated gVisor release for reproducible worker builds, e.g. "20240916.0".
+gvisor_release = "latest"

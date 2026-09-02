@@ -1,0 +1,85 @@
+#!/bin/bash
+# Agent Fabric worker bootstrap (Amazon Linux 2023, x86_64): Docker + gVisor.
+# Rendered by Terraform; $${...} would be a Terraform escape, plain $VAR is bash.
+set -euo pipefail
+exec > >(tee -a /var/log/agent-fabric-bootstrap.log | logger -t agent-fabric-bootstrap) 2>&1
+
+REGION="${aws_region}"
+ECR_REGISTRY="${ecr_registry}"
+IMAGE="${image}"
+WORKSPACE_ROOT=/var/lib/agent-fabric/workspaces
+
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+# --- Docker ------------------------------------------------------------------
+dnf install -y docker
+systemctl enable --now docker
+
+# --- gVisor (official release binaries, checksum verified) -------------------
+ARCH=$(uname -m)
+GVISOR_URL="https://storage.googleapis.com/gvisor/releases/release/${gvisor_release}/$ARCH"
+TMP=$(mktemp -d)
+cd "$TMP"
+for f in runsc runsc.sha512 containerd-shim-runsc-v1 containerd-shim-runsc-v1.sha512; do
+  curl -fsSL -o "$f" "$GVISOR_URL/$f"
+done
+sha512sum -c runsc.sha512 containerd-shim-runsc-v1.sha512
+chmod a+rx runsc containerd-shim-runsc-v1
+mv runsc containerd-shim-runsc-v1 /usr/local/bin/
+cd / && rm -rf "$TMP"
+
+# Registers the "runsc" runtime in /etc/docker/daemon.json.
+/usr/local/bin/runsc install
+systemctl restart docker
+docker info --format '{{json .Runtimes}}' | grep -q runsc || { echo "runsc runtime missing after install"; exit 1; }
+
+# Workspaces are bind-mounted into sandboxes by HOST path (worker/sandbox/gvisor.go),
+# so the worker container must see the same path as the Docker daemon.
+install -d -m 0755 "$WORKSPACE_ROOT"
+install -d -m 0755 /etc/agent-fabric
+
+# --- ECR login helper --------------------------------------------------------
+cat > /usr/local/bin/agent-fabric-ecr-login <<LOGIN
+#!/bin/bash
+set -euo pipefail
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+LOGIN
+chmod 0755 /usr/local/bin/agent-fabric-ecr-login
+
+# --- systemd unit: worker daemon, restarts forever until the image exists ----
+cat > /etc/systemd/system/agent-fabric-worker.service <<UNIT
+[Unit]
+Description=Agent Fabric gVisor worker
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker rm -f agent-fabric-worker
+ExecStartPre=/usr/local/bin/agent-fabric-ecr-login
+ExecStartPre=/usr/bin/docker pull $IMAGE
+ExecStart=/usr/bin/docker run --rm --name agent-fabric-worker \\
+  --log-driver awslogs \\
+  --log-opt awslogs-region=$REGION \\
+  --log-opt awslogs-group=${log_group} \\
+  --log-opt awslogs-stream=$INSTANCE_ID \\
+  -e CONTROL_PLANE_GRPC=${control_plane_grpc} \\
+  -e WORKER_ID=$INSTANCE_ID \\
+  -e WORKSPACE_ROOT=$WORKSPACE_ROOT \\
+  -v /var/run/docker.sock:/var/run/docker.sock \\
+  -v $WORKSPACE_ROOT:$WORKSPACE_ROOT \\
+  $IMAGE
+ExecStop=/usr/bin/docker stop --time 20 agent-fabric-worker
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now agent-fabric-worker.service
+echo "agent-fabric worker bootstrap finished"

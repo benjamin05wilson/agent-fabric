@@ -1,0 +1,143 @@
+#!/bin/bash
+# Agent Fabric control-plane bootstrap (Amazon Linux 2023, arm64).
+# Rendered by Terraform; $${...} would be a Terraform escape, plain $VAR is bash.
+set -euo pipefail
+exec > >(tee -a /var/log/agent-fabric-bootstrap.log | logger -t agent-fabric-bootstrap) 2>&1
+
+REGION="${aws_region}"
+ECR_REGISTRY="${ecr_registry}"
+IMAGE="${image}"
+
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+# --- Docker + compose plugin ------------------------------------------------
+dnf install -y docker jq
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-$(uname -m)" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+systemctl enable --now docker
+
+# --- Configuration from Secrets Manager -------------------------------------
+install -d -m 0700 /etc/agent-fabric
+
+DB_JSON=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "${database_secret_arn}" --query SecretString --output text)
+APP_JSON=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "${app_secret_arn}" --query SecretString --output text)
+
+DB_USER=$(jq -r .username <<<"$DB_JSON")
+DB_PASS=$(jq -r .password <<<"$DB_JSON")
+DB_HOST=$(jq -r .host <<<"$DB_JSON")
+DB_PORT=$(jq -r .port <<<"$DB_JSON")
+DB_NAME=$(jq -r .dbname <<<"$DB_JSON")
+API_KEY=$(jq -r .api_key <<<"$APP_JSON")
+S3_KEY=$(jq -r .s3_access_key_id <<<"$APP_JSON")
+S3_SECRET=$(jq -r .s3_secret_access_key <<<"$APP_JSON")
+
+# The application reads these through pydantic-settings (control-plane/agent_fabric/config.py).
+# MINIO_* is the S3-compatible client config; the endpoint is plain AWS S3 over TLS.
+umask 077
+cat > /etc/agent-fabric/.env <<ENV
+DATABASE_URL=postgresql+asyncpg://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME
+REDIS_URL=${redis_url}
+MINIO_ENDPOINT=${s3_endpoint}
+MINIO_ACCESS_KEY=$S3_KEY
+MINIO_SECRET_KEY=$S3_SECRET
+MINIO_BUCKET=${logs_bucket}
+MINIO_SECURE=true
+API_KEY=$API_KEY
+API_KEY_PROJECT=${api_key_project}
+GRPC_BIND=0.0.0.0:50051
+ENV
+unset DB_PASS API_KEY S3_SECRET DB_JSON APP_JSON
+umask 022
+
+# --- Compose file: api + grpc + scheduler from the same image ---------------
+# Mirrors docker-compose.yml in the repository minus the local Postgres/Redis/
+# MinIO services (replaced by RDS, ElastiCache and S3).
+cat > /etc/agent-fabric/docker-compose.yml <<COMPOSE
+name: agent-fabric
+services:
+  api:
+    image: $IMAGE
+    env_file: /etc/agent-fabric/.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: $REGION
+        awslogs-group: ${log_group}
+        awslogs-stream: $INSTANCE_ID/api
+  grpc:
+    image: $IMAGE
+    entrypoint: ["agent-fabric-grpc"]
+    env_file: /etc/agent-fabric/.env
+    ports:
+      - "50051:50051"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: $REGION
+        awslogs-group: ${log_group}
+        awslogs-stream: $INSTANCE_ID/grpc
+  scheduler:
+    image: $IMAGE
+    entrypoint: ["agent-fabric-scheduler"]
+    env_file: /etc/agent-fabric/.env
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: $REGION
+        awslogs-group: ${log_group}
+        awslogs-stream: $INSTANCE_ID/scheduler
+COMPOSE
+
+# --- ECR login helper (tokens expire after 12h; re-run before every start) --
+cat > /usr/local/bin/agent-fabric-ecr-login <<LOGIN
+#!/bin/bash
+set -euo pipefail
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+LOGIN
+chmod 0755 /usr/local/bin/agent-fabric-ecr-login
+
+# --- systemd unit: keeps retrying until the image exists in ECR -------------
+cat > /etc/systemd/system/agent-fabric.service <<UNIT
+[Unit]
+Description=Agent Fabric control plane (api, grpc, scheduler)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/agent-fabric
+ExecStartPre=/usr/local/bin/agent-fabric-ecr-login
+ExecStartPre=/usr/bin/docker compose pull
+ExecStart=/usr/bin/docker compose up --remove-orphans
+ExecStop=/usr/bin/docker compose down
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now agent-fabric.service
+echo "agent-fabric control-plane bootstrap finished"
