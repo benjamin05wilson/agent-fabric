@@ -1,6 +1,6 @@
 # Benchmarks
 
-Two runners exist. Both drive the real control plane through the same gRPC and
+Three scale runners exist. All drive the real control plane through the same gRPC and
 HTTP contracts a Go worker and an API client use; nothing is mocked.
 
 | Runner | Where it runs | What it records |
@@ -77,7 +77,7 @@ scheduler throughput; both values are recorded in the result file.
 ```powershell
 docker compose up --build -d
 ./benchmarks/run_tiers.ps1 -Tiers 100,1000 -Jobs 10000 -Duration 600
-python benchmarks/run_docker_scale.py --tiers 10000,25000,50000,100000 --jobs 10000
+python benchmarks/run_docker_scale.py --tiers 10000,25000,50000 --jobs 10000
 ```
 
 Set `PROJECT_MAX_QUEUED` and `PROJECT_MAX_RUNNING` in `.env` first, otherwise
@@ -87,5 +87,6 @@ the default limits (1,000 queued, 20 running) dominate the result.
 
 Escalation stops when memory exceeds 80% of the host, when swap activity
 affects results, when the error rate exceeds 1%, or when the control plane
-cannot recover. The 100,000 and 1,000,000 tiers are opt-in experiments, not
-acceptance claims.
+cannot recover. The portfolio baseline is frozen at the verified 50,000-worker
+tier. Do not retry higher tiers on Docker Desktop; use a properly tuned Linux
+host and publish a new environment record before making a larger claim.

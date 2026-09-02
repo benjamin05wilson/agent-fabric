@@ -33,6 +33,17 @@ jobs:
       - run: go test -race ./...
       - run: go vet ./...
 
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+      - run: terraform fmt -check -recursive infra/terraform
+      - run: terraform -chdir=infra/terraform/envs/dev init -backend=false -input=false
+      - run: terraform -chdir=infra/terraform/envs/dev validate -no-color
+
   contracts-and-compose:
     runs-on: ubuntu-latest
     steps:
@@ -47,4 +58,3 @@ jobs:
       - run: buf breaking --against '.git#ref=refs/remotes/origin/main' || test "${{ github.ref_name }}" = main
       - run: docker compose config --quiet
       - run: docker compose build api grpc outbox scheduler worker loadgen
-

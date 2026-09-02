@@ -1,11 +1,10 @@
 # Agent Fabric on AWS (Terraform)
 
-A small, real, deployable environment for the control plane described in
-[`agent_fabric_build_plan.md` section 13](../../agent_fabric_build_plan.md).
-It exists to demonstrate modules, environment configuration, IAM boundaries,
-networking, service configuration, a remote state strategy and reproducible
-create/destroy — not to be a production platform. Nothing here is expensive
-on purpose.
+A small, deployable AWS environment for the control plane described in the
+[architecture documentation](../../docs/architecture.md). It demonstrates
+modules, environment configuration, IAM boundaries, networking, service
+configuration, a remote state strategy, and reproducible create/destroy — not
+a production platform. Nothing here is expensive on purpose.
 
 ## What gets created
 
@@ -118,6 +117,20 @@ NAT data processing (image pulls, git clones) and a third worker add to this.
 
   Then either edit the `REPLACE_ME-...` placeholders in `envs/dev/backend.tf`
   or pass them at init time (shown below).
+
+## Static validation
+
+CI runs formatting and configuration validation without contacting an AWS
+account:
+
+```bash
+terraform fmt -check -recursive infra/terraform
+terraform -chdir=infra/terraform/envs/dev init -backend=false -input=false
+terraform -chdir=infra/terraform/envs/dev validate
+```
+
+`validate` checks provider and module configuration, not credentials, remote
+state availability, an execution plan, or a real AWS deployment.
 
 ## Deploy
 
@@ -252,7 +265,7 @@ table are not managed here and remain.
   drift (`ignore_changes = [ami]`); the worker launch template does not, so a
   new AMI shows up as a rolling instance refresh on the next apply. Pin with
   `ami_id` if you want it frozen.
-- **No CI**, no drift detection, no cost alarms, no backups beyond 1 day of
-  RDS automated backups.
+- **No drift detection, cost alarms, or apply pipeline.** CI performs static
+  format and validation checks only. RDS automated backups retain one day.
 - The `dev` environment is the only one. A second environment is a new
   directory under `envs/` reusing the same modules with a different state key.

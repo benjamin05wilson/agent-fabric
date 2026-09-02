@@ -192,12 +192,8 @@ def metrics_snapshot() -> dict[str, float | None]:
     return {
         "placements": prometheus('sum(agent_fabric_placements_total{job="schedulers"})'),
         "queue_depth": prometheus('max(agent_fabric_queue_depth{job="schedulers"})'),
-        "outstanding_offers": prometheus(
-            'max(agent_fabric_outstanding_offers{job="schedulers"})'
-        ),
-        "active_streams": prometheus(
-            'sum(agent_fabric_active_worker_streams{job="gateways"})'
-        ),
+        "outstanding_offers": prometheus('max(agent_fabric_outstanding_offers{job="schedulers"})'),
+        "active_streams": prometheus('sum(agent_fabric_active_worker_streams{job="gateways"})'),
         "heartbeats": prometheus('sum(agent_fabric_heartbeats_total{job="gateways"})'),
         "gateway_p95_seconds": prometheus(
             "histogram_quantile(0.95,sum by(le)(rate("
@@ -392,7 +388,7 @@ def run_tier(args: argparse.Namespace, tier: int) -> dict[str, Any]:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Instrumented Docker fleet scale benchmark")
-    result.add_argument("--tiers", default="10000,25000,50000,100000")
+    result.add_argument("--tiers", default="10000,25000,50000")
     result.add_argument("--jobs", type=int, default=10000)
     result.add_argument("--duration", type=int, default=600)
     result.add_argument("--register-timeout", type=int, default=600)

@@ -2,6 +2,9 @@
 
 Agent Fabric is a distributed execution control plane for running untrusted repository workloads on resource-aware workers. It keeps the agent payload deliberately simple so the infrastructure problems remain visible: scheduling, sandboxing, failure recovery, resource accounting, observability, and control-plane scale.
 
+[![CI](https://github.com/benjamin05wilson/agent-fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/benjamin05wilson/agent-fabric/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 The repository is benchmark-led. Reported numbers come from committed evidence under [`benchmarks/reports`](benchmarks/reports); failed experiments are kept and are not promoted as successful scale claims.
 
 ## Verified results
@@ -23,52 +26,24 @@ Full gateway evidence: [`benchmarks/reports/2026-09-02-gateway-sharding`](benchm
 
 Parallel scheduler evidence: [`benchmarks/reports/2026-09-02-parallel-scheduler`](benchmarks/reports/2026-09-02-parallel-scheduler/README.md). The full 1/2/4/8 scheduling-plane claim is not made: one, two, and four replicas were correctness-clean, throughput peaked at two, and eight produced 62 expired unacknowledged offers.
 
+> **Frozen portfolio baseline:** 50,000 is the highest verified worker tier for
+> `v0.1.0-portfolio`. The failed 100k experiment remains boundary evidence, not
+> a target to rerun on Docker Desktop. Any higher-tier claim requires a properly
+> tuned Linux host and a fresh, reproducible evidence set.
+
 ## Architecture
 
-```text
-                                +-------------------+
-                                |      FastAPI      |
-                                +---------+---------+
-                                          |
-                                          v
-                                +-------------------+
-                                |    PostgreSQL     |
-                                | durable authority |
-                                +---------+---------+
-                                          |
-                                 transactional outbox
-                                          |
-                                          v
-                                +-------------------+
-                                | outbox publisher  |
-                                +---------+---------+
-                                          |
-                                          v
-                                      Redis Streams
-                                          |
-                              +-----------+-----------+
-                              |                       |
-                              v                       v
-                         scheduler(s)            shard routing
-                                                      |
-                                              +-------v-------+
-                                              |    HAProxy    |
-                                              +-------+-------+
-                                                      |
-                              +-----------------------+-----------------------+
-                              |       |       |       |       |       |       |
-                              v       v       v       v       v       v       v
-                            gRPC    gRPC    gRPC    gRPC    gRPC    gRPC    gRPC ...
-                           shard 0  shard 1  shard 2  shard 3  shard 4  shard 5  shard 7
-                              |       |       |       |       |       |       |
-                              +-------+-------+-------+-------+-------+-------+
-                                                      |
-                                           local worker registries
-                                                      |
-                                         bidirectional gRPC streams
-                                                      |
-                                                      v
-                                            Go workers -> gVisor
+```mermaid
+flowchart LR
+    Client[API client] --> API[FastAPI]
+    API -->|run + outbox transaction| DB[(PostgreSQL<br/>durable authority)]
+    Schedulers[Scheduler replicas<br/>parallel plan, locked commit] -->|poll, reserve, create lease| DB
+    DB --> Outbox[Outbox publisher]
+    Outbox --> Redis[(Redis Streams<br/>delivery + shard routing)]
+    Redis --> Gateways[HAProxy → 8 gRPC gateway shards]
+    Gateways <-->|long-lived bidirectional streams| Workers[Go workers]
+    Workers --> Sandbox[runsc / gVisor sandboxes]
+    Gateways -->|registration, heartbeat batches,<br/>ack, events, completion| DB
 ```
 
 PostgreSQL is authoritative for runs, attempts, leases, and reservations. Redis is a delivery and wake-up layer rather than the source of truth. Reconciliation reconstructs work from durable state after interruptions.
@@ -85,18 +60,25 @@ The connection plane uses **eight Python gateway shards behind HAProxy**. Each s
 - **Observability:** OpenTelemetry, Prometheus, Tempo, Grafana, structured logs, and committed benchmark evidence.
 - **Infrastructure as code:** a small AWS Terraform environment for VPC, RDS PostgreSQL, ElastiCache Redis, S3 logs, control-plane compute, gVisor worker ASG, and scoped IAM.
 
-## Scaling story
+## Engineering findings
 
-The project intentionally preserves the failures that drove each redesign.
+The measured bottleneck progression drove the architecture:
 
-1. **Outbox starvation.** Publishing inside the API event loop produced 20-43 s lag while lease offers had a 10 s acknowledgement deadline. Moving the publisher into a separate pipelined process reduced measured lag to milliseconds.
-2. **Reservation accounting bug.** A stale SQLAlchemy identity-map value could overwrite concurrent worker releases. Locked reloads fixed the leak; the post-fix audit is zero in the verified workloads.
-3. **Single-gateway ceiling.** The original gateway saturated around 3.9k-4.2k workers at roughly 800 heartbeats/s because one Python process handled every stream and one Redis reader per worker.
-4. **Gateway redesign.** Eight shards, one supervised Redis consumer per shard, local fanout, batched ephemeral heartbeats, bounded event persistence, and per-shard database pools moved the verified tier to **50,000 concurrent durable streams**.
-5. **Load-balancer ceiling.** A 50k attempt first stopped at 41,812 accepted streams because HAProxy hit its configured connection/file-descriptor limit. Raising that explicit ceiling allowed the 50k tier to pass.
-6. **100k boundary.** The 100k connection storm peaked around 43.8k active streams before Docker Desktop networking/management APIs became unstable. The repository therefore reports **50k as the highest verified tier on this host**.
+- API-hosted outbox publishing stalled for 20–43 s under submission bursts;
+  isolating and batching the publisher reduced lag to milliseconds.
+- The serial scheduler plateaued at roughly 14–21 placements/s; batch planning,
+  targeted locks, and bounded offers removed the per-placement query loop.
+- One gateway saturated around 3.9k–4.2k workers at roughly 800 heartbeats/s;
+  eight shards, local fanout, and coalesced heartbeats reached 50,000 streams.
+- HAProxy then stopped the first 50k run at 41,812 streams; making its connection
+  and file-descriptor ceiling explicit allowed the verified tier to pass.
+- Scheduler parallelism improved clean throughput through two replicas, stayed
+  correct but slower at four, and regressed with retries at eight. Contention,
+  not fleet connection capacity, is now the measured scheduling boundary.
 
-The next measured bottlenecks are scheduler throughput and the load-balancer/host networking layer, not gateway memory or per-worker Redis fanout.
+The failed 100k connection storm identified Docker Desktop networking and
+management APIs as the next host-level boundary. That result is preserved, but
+50k remains the frozen public claim until testing moves to Linux.
 
 ## Scheduler evolution
 
@@ -221,6 +203,10 @@ Additional documentation:
 - [Threat model](docs/threat-model.md)
 - [Scaling methodology](docs/scaling.md)
 - [Terraform environment](infra/terraform/README.md)
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Limitations
 
