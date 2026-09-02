@@ -9,5 +9,7 @@ Delivery is at least once. Effects are not claimed to be exactly once.
 - PostgreSQL is authoritative. Redis loss delays delivery, while polling and outbox reconciliation recover durable queued work.
 - Cancellation of queued work is immediate. Running work becomes `CANCEL_REQUESTED` until the worker confirms termination or its lease expires.
 
-Required chaos measurements include detection delay, lease-expiry delay, requeue latency, recovery time, tail latency, and lost-job count. `agent-fabric-loadgen --kill-fraction` produces them from PostgreSQL timestamps; measured values live in `benchmarks/reports`.
+Required chaos measurements include detection delay, lease-expiry delay, requeue latency, recovery time, tail latency, and lost-job count. Two harnesses produce them: the load generator's `--kill-fraction` (worker loss with a PostgreSQL audit, `benchmarks/run_native.py`) and `tests/chaos/run_scenarios.py`, which adds scheduler, PostgreSQL, and Redis restarts and computes every figure from PostgreSQL timestamps. Measured results are in `benchmarks/reports`.
+
+Detection is bounded by lease expiry, not by stream closure: the gateway does not act on a dropped gRPC stream, so a dead worker stays "healthy" until its last heartbeat is 15 s old and keeps receiving offers until then; each of those offers expires after its 10 s acknowledgement deadline and is requeued. `agent-fabric-loadgen --kill-fraction` produces them from PostgreSQL timestamps; measured values live in `benchmarks/reports`.
 
