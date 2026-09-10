@@ -78,7 +78,7 @@ services:
       timeout: 2s
       retries: 20
     ports:
-      - 9001:9001
+      - 127.0.0.1:9001:9001
     volumes:
       - minio-data:/data
 
@@ -93,7 +93,7 @@ services:
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
     ports:
-      - 8000:8000
+      - 127.0.0.1:8000:8000
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 2s
@@ -170,7 +170,7 @@ services:
       grpc-6: {condition: service_started}
       grpc-7: {condition: service_started}
     ports:
-      - 50051:50051
+      - 127.0.0.1:50051:50051
 
   outbox:
     build:
@@ -236,7 +236,7 @@ services:
     environment:
       CONTROL_PLANE_GRPC: grpc:50051
       WORKER_ID: local-gvisor-1
-      WORKSPACE_ROOT: /var/lib/agent-fabric/workspaces
+      WORKSPACE_ROOT: ${AF_WORKSPACE_ROOT:-/var/lib/agent-fabric/workspaces}
       WORKER_GPU_COUNT: ${WORKER_GPU_COUNT:-0}
       WORKER_VRAM_MB: ${WORKER_VRAM_MB:-0}
       WORKER_CAPABILITIES: ${WORKER_CAPABILITIES:-network-disabled}
@@ -244,7 +244,11 @@ services:
       grpc: {condition: service_started}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - worker-workspaces:/var/lib/agent-fabric/workspaces
+      - type: bind
+        source: ${AF_WORKSPACE_ROOT:-/var/lib/agent-fabric/workspaces}
+        target: ${AF_WORKSPACE_ROOT:-/var/lib/agent-fabric/workspaces}
+        bind:
+          create_host_path: false
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.132.0
@@ -265,7 +269,7 @@ services:
     volumes:
       - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
     ports:
-      - 9090:9090
+      - 127.0.0.1:9090:9090
 
   grafana:
     image: grafana/grafana:12.1.0
@@ -273,7 +277,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     ports:
-      - 3000:3000
+      - 127.0.0.1:3000:3000
     volumes:
       - grafana-data:/var/lib/grafana
 
@@ -281,6 +285,5 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
-  worker-workspaces:
   tempo-data:
   grafana-data:

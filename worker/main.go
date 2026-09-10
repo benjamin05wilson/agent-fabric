@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	workerv1 "github.com/bvwilson/agent-fabric/worker/gen"
-	"github.com/bvwilson/agent-fabric/worker/sandbox"
+	workerv1 "github.com/benjamin05wilson/agent-fabric/worker/gen"
+	"github.com/benjamin05wilson/agent-fabric/worker/sandbox"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

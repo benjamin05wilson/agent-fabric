@@ -86,7 +86,7 @@ class LeaseAcknowledgement(_message.Message):
     lease_token: str
     accepted: bool
     reason: str
-    def __init__(self, run_id: _Optional[str] = ..., attempt_id: _Optional[str] = ..., lease_token: _Optional[str] = ..., accepted: _Optional[bool] = ..., reason: _Optional[str] = ...) -> None: ...
+    def __init__(self, run_id: _Optional[str] = ..., attempt_id: _Optional[str] = ..., lease_token: _Optional[str] = ..., accepted: bool = ..., reason: _Optional[str] = ...) -> None: ...
 
 class LeaseOffer(_message.Message):
     __slots__ = ("run_id", "attempt_id", "lease_token", "expires_unix_millis", "repository_url", "repository_ref", "argv", "environment", "profile", "image_digest", "cpu_millis", "memory_mb", "pids", "disk_mb", "timeout_seconds", "network_policy", "traceparent", "gpu_count", "vram_mb", "required_capabilities")
@@ -183,7 +183,7 @@ class CleanupConfirmation(_message.Message):
     attempt_id: str
     successful: bool
     message: str
-    def __init__(self, run_id: _Optional[str] = ..., attempt_id: _Optional[str] = ..., successful: _Optional[bool] = ..., message: _Optional[str] = ...) -> None: ...
+    def __init__(self, run_id: _Optional[str] = ..., attempt_id: _Optional[str] = ..., successful: bool = ..., message: _Optional[str] = ...) -> None: ...
 
 class CancelRun(_message.Message):
     __slots__ = ("run_id", "attempt_id")

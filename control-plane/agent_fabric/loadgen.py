@@ -283,6 +283,7 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
     for worker in workers:
         worker.task = asyncio.create_task(worker.run(stop))
     tasks = [worker.task for worker in workers if worker.task is not None]
+    chaos_task: asyncio.Task[None] | None = None
     try:
         registered = await wait_for_registration(args, measurements)
         if registered:
@@ -302,6 +303,8 @@ async def benchmark(args: argparse.Namespace) -> dict[str, object]:
         # Measurement is over: tear the fleet down without waiting for each stream's
         # next heartbeat tick, which took tens of minutes against a saturated gateway.
         stop.set()
+        if chaos_task is not None:
+            tasks.append(chaos_task)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -727,11 +730,25 @@ def parser() -> argparse.ArgumentParser:
     )
     result.add_argument("--label", default="")
     result.add_argument("--output", type=Path)
+    result.add_argument(
+        "--deadline",
+        type=float,
+        default=120,
+        help="whole-run deadline including registration, submission and audit",
+    )
+    result.add_argument(
+        "--require-success",
+        action="store_true",
+        help="fail unless every job succeeds and all reservations are released",
+    )
     return result
 
 
-def run() -> None:
-    args = parser().parse_args()
+def validate_args(args: argparse.Namespace) -> None:
+    if args.deadline <= 0:
+        raise SystemExit("--deadline must be positive")
+    if args.require_success and (not args.database_url or args.jobs <= 0):
+        raise SystemExit("--require-success requires a database URL and positive job count")
     if args.workers < 0 or args.workers > 1_000_000:
         raise SystemExit("--workers must be between 0 and 1,000,000")
     if args.workers == 0 and args.expected_workers <= 0:
@@ -746,9 +763,53 @@ def run() -> None:
         raise SystemExit("failure rates must be between zero and one")
     if not 0 <= args.kill_fraction <= 1:
         raise SystemExit("--kill-fraction must be between zero and one")
-    result = asyncio.run(benchmark(args))
+
+
+def success_errors(result: dict[str, Any], jobs: int, workers: int) -> list[str]:
+    """Strict tiny-demo gate; the audit assumes an isolated database/fleet."""
+    errors = []
+    report = result.get("results", {})
+    registration = report.get("registration", {})
+    if registration.get("timed_out", True) or registration.get("durable_workers") != workers:
+        errors.append("durable worker registration does not match target")
+    if report.get("submission", {}).get("accepted") != jobs:
+        errors.append("not all submissions were accepted")
+    durable = result.get("audit", {})
+    if durable.get("run_states") != {"SUCCEEDED": jobs}:
+        errors.append("not all jobs durably succeeded")
+    if durable.get("attempt_states") != {"SUCCEEDED": jobs}:
+        errors.append("unexpected live, failed or retried attempts")
+    reservations = durable.get("reserved_after_run")
+    if not reservations or any(reservations.values()):
+        errors.append("outstanding reservations or missing accounting audit")
+    return errors
+
+
+async def bounded_benchmark(args: argparse.Namespace) -> dict[str, Any]:
+    async with asyncio.timeout(args.deadline):
+        return await benchmark(args)
+
+
+def run() -> None:
+    args = parser().parse_args()
+    validate_args(args)
+    try:
+        result = asyncio.run(bounded_benchmark(args))
+    except TimeoutError:
+        result = {"error": "whole-run deadline exceeded", "deadline_seconds": args.deadline}
+    errors = (
+        success_errors(result, args.jobs, args.expected_workers or args.workers)
+        if args.require_success
+        else []
+    )
+    if "error" in result:
+        errors.append(str(result["error"]))
+    if errors:
+        result["validation_errors"] = errors
     rendered = json.dumps(result, indent=2, sort_keys=True, default=str)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
+    if errors:
+        raise SystemExit(1)

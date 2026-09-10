@@ -1,4 +1,4 @@
-module github.com/bvwilson/agent-fabric/worker
+module github.com/benjamin05wilson/agent-fabric/worker
 
 go 1.24
 

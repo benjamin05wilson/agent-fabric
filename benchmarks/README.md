@@ -62,7 +62,7 @@ versioned.
 pip install -e ".[dev]"
 export DATABASE_URL=postgresql+asyncpg://agent_fabric:agent_fabric@localhost:5432/agent_fabric
 export REDIS_URL=redis://localhost:6379/0 MINIO_ENDPOINT=localhost:9000
-psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements'  # needs shared_preload_libraries
+psql "${DATABASE_URL/postgresql+asyncpg:/postgresql:}" -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements'  # needs shared_preload_libraries
 python benchmarks/run_native.py --tiers 100,1000,10000 --jobs 10000 --duration 600 --label baseline
 python benchmarks/run_native.py --tiers 1000 --jobs 5000 --kill-fraction 0.1 --kill-after-seconds 5 --label worker-loss
 python benchmarks/report.py benchmarks/results --output benchmarks/results/REPORT.md

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package agentfabric.worker.v1;
 
-option go_package = "github.com/example/agent-fabric/worker/gen/worker/v1;workerv1";
+option go_package = "github.com/benjamin05wilson/agent-fabric/worker/gen;workerv1";
 
 service WorkerControl {
   rpc Connect(stream WorkerMessage) returns (stream ControlMessage);

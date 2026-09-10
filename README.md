@@ -7,13 +7,15 @@ Agent Fabric is a distributed execution control plane for running untrusted repo
 
 The repository is benchmark-led. Reported numbers come from committed evidence under [`benchmarks/reports`](benchmarks/reports); failed experiments are kept and are not promoted as successful scale claims.
 
-## Verified results
+## Historical benchmark results
 
-Measured on 2 September 2026 using a 24-vCPU, 62.5-GiB Docker Desktop allocation unless otherwise noted.
+Committed historical measurements, not a fresh verification of this checkout. Workers **simulate execution over real gRPC**; these are worker streams, not machines, model agents or production users. Job counts are total workload volume, not concurrent LLM agents.
 
-| Experiment | Verified result |
+Measured on 2 September 2026 using a 24-vCPU, 62.5-GiB Docker Desktop allocation unless otherwise noted. The 50k run recorded **4,164 transient coordinator stream errors**, despite eventual job completion. Its retained JSON is summary-only; the detailed reservation audit was not retained.
+
+| Experiment | Recorded result |
 |---|---|
-| Gateway scale | **50,000/50,000 durable live gRPC worker streams** |
+| Gateway scale | **50,000/50,000 durable simulated worker streams over real gRPC** |
 | 50k integrity workload | **10,000/10,000 jobs succeeded; 0 retries, 0 lost runs, 0 reservation leaks** |
 | 50k registration | **31.125 s** |
 | Heartbeat load at 50k | approximately **10,000 heartbeats/s** at a 5 s cadence |
@@ -26,7 +28,7 @@ Full gateway evidence: [`benchmarks/reports/2026-09-02-gateway-sharding`](benchm
 
 Parallel scheduler evidence: [`benchmarks/reports/2026-09-02-parallel-scheduler`](benchmarks/reports/2026-09-02-parallel-scheduler/README.md). The full 1/2/4/8 scheduling-plane claim is not made: one, two, and four replicas were correctness-clean, throughput peaked at two, and eight produced 62 expired unacknowledged offers.
 
-> **Frozen portfolio baseline:** 50,000 is the highest verified worker tier for
+> **Frozen portfolio baseline:** 50,000 is the highest historically verified simulated worker tier for
 > `v0.1.0-portfolio`. The failed 100k experiment remains boundary evidence, not
 > a target to rerun on Docker Desktop. Any higher-tier claim requires a properly
 > tuned Linux host and a fresh, reproducible evidence set.
