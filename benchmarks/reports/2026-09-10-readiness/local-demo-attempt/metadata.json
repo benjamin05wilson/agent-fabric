@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-09-10T16:22:25.709796+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.13",
+  "project": "agent-fabric-demo-a4b5041b0692",
+  "mode": "demo",
+  "commit": "fc46b479756023186b3219a03486efdcbef6fa95",
+  "dirty": true,
+  "exit_code": 1,
+  "elapsed_seconds": 0.027
+}

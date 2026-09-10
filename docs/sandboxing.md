@@ -1,6 +1,6 @@
 # Sandboxing
 
-The production backend launches OCI images through Docker's `runsc` runtime. Root filesystems are read-only, Linux capabilities are dropped, privilege escalation is disabled, the workload runs as a non-root UID, and only a per-run workspace is writable. CPU, memory, PID, timeout, and network policies are passed explicitly.
+The gVisor backend launches OCI images through Docker's `runsc` runtime. Root filesystems are read-only, Linux capabilities are dropped, privilege escalation is disabled, the workload runs as a non-root UID, and only a per-run workspace is writable. CPU, memory, PID, timeout, and network policies are passed explicitly.
 
 Repository fetching is separate from execution. Both the API and worker reject credentials and literal private addresses; the worker resolves the hostname immediately before fetch and rejects non-public results. Git hooks, submodules, LFS, interactive credentials, system configuration, and the file protocol are disabled.
 

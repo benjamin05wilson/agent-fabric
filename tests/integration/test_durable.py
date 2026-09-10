@@ -57,15 +57,14 @@ async def store(monkeypatch):
     publisher = outbox.OutboxPublisher()
     planners = [scheduler.Scheduler(), scheduler.Scheduler()]
     try:
-        async with asyncio.timeout(30):
-            yield SimpleNamespace(
-                factory=factory,
-                settings=settings,
-                gateway=gateway,
-                publisher=publisher,
-                planners=planners,
-                worker_id=schema,
-            )
+        yield SimpleNamespace(
+            factory=factory,
+            settings=settings,
+            gateway=gateway,
+            publisher=publisher,
+            planners=planners,
+            worker_id=schema,
+        )
     finally:
         await gateway.redis.hdel("af:worker:owners", schema)
         await gateway.redis.delete(f"af:gateway:{schema}:outbound")

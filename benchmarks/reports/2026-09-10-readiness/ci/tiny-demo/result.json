@@ -1,0 +1,141 @@
+{
+  "audit": {
+    "attempt_states": {
+      "SUCCEEDED": 8
+    },
+    "end_to_end_ms": {
+      "count": 8,
+      "max": 2179.196,
+      "mean": 1414.024,
+      "p50": 1675.795,
+      "p95": 2179.196,
+      "p99": 2179.196
+    },
+    "in_flight_reservations": {
+      "cpu_millis": 0,
+      "gpu": 0,
+      "memory_mb": 0,
+      "pids": 0,
+      "vram_mb": 0
+    },
+    "leaked_reservations": {
+      "cpu_millis": 0,
+      "gpu": 0,
+      "memory_mb": 0,
+      "pids": 0,
+      "vram_mb": 0
+    },
+    "reserved_after_run": {
+      "cpu_millis": 0,
+      "gpu": 0,
+      "memory_mb": 0,
+      "pids": 0,
+      "vram_mb": 0
+    },
+    "run_states": {
+      "SUCCEEDED": 8
+    },
+    "runs_lost": 0,
+    "runs_non_terminal": 0,
+    "runs_total": 8,
+    "runs_with_retries": 0,
+    "time_to_start_by_class_ms": {
+      "cpu": {
+        "count": 8,
+        "max": 2104.127,
+        "mean": 1348.075,
+        "p50": 1594.446,
+        "p95": 2104.127,
+        "p99": 2104.127
+      },
+      "gpu": {
+        "count": 0,
+        "max": null,
+        "mean": null,
+        "p50": null,
+        "p95": null,
+        "p99": null
+      }
+    },
+    "time_to_start_ms": {
+      "count": 8,
+      "max": 2104.127,
+      "mean": 1348.075,
+      "p50": 1594.446,
+      "p95": 2104.127,
+      "p99": 2104.127
+    },
+    "unpublished_outbox_events": 0,
+    "workers_in_table": 2
+  },
+  "benchmark_id": "10574e4074a9412fa02a546119c67d4c",
+  "configuration": {
+    "api": "http://api:8000",
+    "control": "grpc:50051",
+    "deadline": 60.0,
+    "disappear_rate": 0.0,
+    "duration": 30,
+    "expected_workers": 0,
+    "failure_rate": 0.0,
+    "gpu_count_per_worker": 1,
+    "gpu_job_fraction": 0.0,
+    "gpu_job_vram_mb": 8192,
+    "gpu_vram_mb_per_worker": 16384,
+    "gpu_workers": 0,
+    "jobs": 8,
+    "kill_after_seconds": 5.0,
+    "kill_fraction": 0.0,
+    "kill_selection": "random",
+    "label": "",
+    "max_duration_ms": 100,
+    "min_duration_ms": 50,
+    "register_timeout": 20.0,
+    "require_success": true,
+    "seed": 42,
+    "submit_concurrency": 2,
+    "worker_offset": 0,
+    "workers": 2
+  },
+  "results": {
+    "chaos": {},
+    "completed": 8,
+    "completion_throughput_per_second": 1.335,
+    "drain": {
+      "drained": true,
+      "seconds_after_start": 5.988
+    },
+    "elapsed_seconds": 5.992,
+    "lease_latency_ms": {
+      "count": 8,
+      "max": 2093.788,
+      "mean": 1332.248,
+      "p50": 1581.194,
+      "p95": 2093.788,
+      "p99": 2093.788
+    },
+    "leases": 8,
+    "mixed_fleet": {
+      "cpu_jobs_on_gpu": 0,
+      "gpu_leases": 0,
+      "gpu_misplacements": 0
+    },
+    "registered_after_seconds": 1.542,
+    "registered_workers": 2,
+    "registration": {
+      "client_streams_started": 2,
+      "durable_workers": 2,
+      "seconds": 1.68,
+      "timed_out": false
+    },
+    "stream_errors": 8,
+    "submission": {
+      "accepted": 8,
+      "attempted": 8,
+      "backpressure_429": 0,
+      "errors": 0,
+      "per_second": 30.189,
+      "seconds": 0.265
+    }
+  },
+  "started_at": "2026-09-10T16:25:09.311087+00:00"
+}

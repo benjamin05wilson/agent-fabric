@@ -1,0 +1,8 @@
+{
+  "source": "benchmarks/reports/2026-09-02-parallel-scheduler/evidence.json",
+  "sha256": "ec008b014d612f57110ddd920041362f808418b70661749c64e142fc129daef2",
+  "generator": "scripts/evidence_chart.py",
+  "matplotlib": "3.11.1",
+  "command": "uv run --locked --extra evidence python scripts/evidence_chart.py",
+  "interpretation": "Historical summary comparison; no fresh benchmark or error bars available"
+}

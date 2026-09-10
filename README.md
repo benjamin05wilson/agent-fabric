@@ -5,6 +5,8 @@ Agent Fabric is a distributed execution control plane for running untrusted repo
 [![CI](https://github.com/benjamin05wilson/agent-fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/benjamin05wilson/agent-fabric/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+[Run the tiny demo](docs/demo.md) · [Real CI transcript](benchmarks/reports/2026-09-10-readiness/README.md) · [Evidence index + chart](benchmarks/EVIDENCE.md) · [Pinned development setup](docs/development.md)
+
 The repository is benchmark-led. Reported numbers come from committed evidence under [`benchmarks/reports`](benchmarks/reports); failed experiments are kept and are not promoted as successful scale claims.
 
 ## Historical benchmark results
@@ -126,69 +128,48 @@ Hostile workloads were executed through the real Go worker under `runsc`.
 
 The failed disk-exhaustion case is intentionally documented rather than hidden. The lease carries a workspace byte limit, but hard enforcement requires a quota-enabled worker filesystem.
 
-## Quick start
+## Quick start: two simulated workers, eight jobs
 
-The control plane runs under Docker Compose. Real gVisor execution requires a Linux/WSL2 Docker Engine with `runsc` installed.
+Prepare images first; image downloads/builds are outside the five-minute demo.
+Requires Python 3.12.13 and Docker with Compose v2. The private stack publishes no
+host ports and uses a unique repo-specific project for automatic cleanup.
 
-```powershell
-Copy-Item .env.example .env
-docker compose up --build -d
-curl.exe http://localhost:8000/health
-```
-
-Submit a run after a worker registers:
-
-```powershell
-$body = @{
-  repository = @{ url = "https://github.com/example/project"; ref = "HEAD" }
-  argv = @("python", "-m", "pytest", "-q")
-  profile = "python"
-  network = "disabled"
-  resources = @{
-    cpu_millis = 1000
-    memory_mb = 512
-    pids = 128
-    disk_mb = 1024
-    timeout_seconds = 300
-  }
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod http://localhost:8000/runs -Method Post `
-  -Headers @{ Authorization = "Bearer af_dev_key"; "Idempotency-Key" = "demo-1" } `
-  -ContentType application/json -Body $body
-```
-
-GPU jobs request accelerator inventory explicitly:
-
-```json
-{
-  "profile": "cuda",
-  "required_capabilities": ["cuda"],
-  "resources": {"gpu": 1, "vram_mb": 8192}
-}
-```
-
-VRAM is scheduler admission accounting, not a hard per-process VRAM limit.
-
-## Real gVisor worker
-
-Install `runsc`, register it with Docker, restart Docker, and verify:
+Bash:
 
 ```bash
-docker run --rm --runtime=runsc hello-world
+python3 scripts/demo.py --prepare --output benchmarks/results/preparation
+python3 scripts/demo.py --regressions --output benchmarks/results/tiny-demo
 ```
 
-Then start the worker and hostile-workload harness:
+PowerShell:
 
-```bash
-docker compose --profile gvisor up --build worker
-python tests/security/run_hostile.py --api http://localhost:8000 --output hostile-results.json
+```powershell
+python scripts/demo.py --prepare --output benchmarks/results/preparation
+if ($LASTEXITCODE -ne 0) { throw "Preparation failed" }
+python scripts/demo.py --regressions --output benchmarks/results/tiny-demo
+if ($LASTEXITCODE -ne 0) { throw "Demo failed; inspect transcript.txt" }
 ```
+
+[Captured Linux CI execution](benchmarks/reports/2026-09-10-readiness/README.md):
+**2 workers, 8 succeeded jobs, zero reservations, 5 real-service regression cases
+passed; 27.05 seconds including cleanup.** The client recorded **8 stream errors**;
+this is successful durable completion, not an error-free transport claim.
+[Full instructions and bounded failure behaviour](docs/demo.md).
+
+## Real gVisor worker: separate Linux route
+
+The Compose workspace bind now uses the same absolute host/container path.
+**Real-worker execution under this repaired topology is still unverified** on the
+readiness host (macOS without Docker/runsc). Use the documented
+[native Linux topology and benign checkout-reading fixture](docs/real-worker.md).
+The fixture uses Python's standard library to read a public repository file;
+an empty or misbound workspace cannot pass. This is separate from the simulated
+demo, and no hostile workload is part of either quick path.
 
 ## Development and benchmarks
 
 ```powershell
-docker run --rm -v "${PWD}/worker:/src" -w /src golang:1.24-bookworm `
+docker run --rm -v "${PWD}/worker:/src" -w /src golang:1.24.13-bookworm `
   sh -c "/usr/local/go/bin/go test ./..."
 docker build -f control-plane/Dockerfile -t agent-fabric-control .
 docker compose config --quiet

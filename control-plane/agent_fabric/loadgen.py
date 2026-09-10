@@ -733,8 +733,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--deadline",
         type=float,
-        default=120,
-        help="whole-run deadline including registration, submission and audit",
+        default=None,
+        help="whole-run deadline (default: register timeout + duration + 60 seconds)",
     )
     result.add_argument(
         "--require-success",
@@ -745,6 +745,8 @@ def parser() -> argparse.ArgumentParser:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    if args.deadline is None:
+        args.deadline = args.register_timeout + args.duration + 60
     if args.deadline <= 0:
         raise SystemExit("--deadline must be positive")
     if args.require_success and (not args.database_url or args.jobs <= 0):

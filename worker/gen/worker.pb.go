@@ -1264,7 +1264,7 @@ const file_worker_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2k\n" +
 	"\rWorkerControl\x12Z\n" +
-	"\aConnect\x12$.agentfabric.worker.v1.WorkerMessage\x1a%.agentfabric.worker.v1.ControlMessage(\x010\x01B>Z<github.com/benjamin05wilson/agent-fabric/worker/gen;workerv1b\x06proto3"
+	"\aConnect\x12$.agentfabric.worker.v1.WorkerMessage\x1a%.agentfabric.worker.v1.ControlMessage(\x010\x01B?Z=github.com/example/agent-fabric/worker/gen/worker/v1;workerv1b\x06proto3"
 
 var (
 	file_worker_proto_rawDescOnce sync.Once

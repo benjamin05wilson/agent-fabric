@@ -1,5 +1,7 @@
 # Benchmarks
 
+Start with the [bounded two-worker demo](../docs/demo.md). The scale commands below are historical experiment tooling, not the quick start.
+
 Three scale runners exist. All drive the real control plane through the same gRPC and
 HTTP contracts a Go worker and an API client use; nothing is mocked.
 
@@ -59,7 +61,8 @@ versioned.
 ## Running natively
 
 ```bash
-pip install -e ".[dev]"
+uv sync --locked --extra dev
+source .venv/bin/activate
 export DATABASE_URL=postgresql+asyncpg://agent_fabric:agent_fabric@localhost:5432/agent_fabric
 export REDIS_URL=redis://localhost:6379/0 MINIO_ENDPOINT=localhost:9000
 psql "${DATABASE_URL/postgresql+asyncpg:/postgresql:}" -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements'  # needs shared_preload_libraries

@@ -66,12 +66,19 @@ def main():
         print(transcript[-1], flush=True)
     finally:
         if not args.prepare:
-            try:
-                command(base + ["logs", "--no-color", "--tail", "100"], 10, check=False)
-                command(base + ["down", "--volumes", "--remove-orphans", "--timeout", "5"], 20)
-            except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-                transcript.append(f"CLEANUP ERROR: {exc}; retry {' '.join(base)} down --volumes")
-                status = 1
+            cleanup_commands = [
+                (base + ["logs", "--no-color", "--tail", "100"], 10),
+                (base + ["down", "--volumes", "--remove-orphans", "--timeout", "5"], 20),
+            ]
+            # A log collection failure must never prevent teardown.
+            for argv, timeout in cleanup_commands:
+                try:
+                    command(argv, timeout)
+                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                    transcript.append(
+                        f"CLEANUP ERROR: {exc}; retry {' '.join(base)} down --volumes"
+                    )
+                    status = 1
         metadata.update(exit_code=status, elapsed_seconds=round(time.monotonic() - started, 3))
         (args.output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         (args.output / "transcript.txt").write_text("\n".join(transcript) + "\n", encoding="utf-8")

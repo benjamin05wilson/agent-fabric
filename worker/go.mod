@@ -1,6 +1,6 @@
 module github.com/benjamin05wilson/agent-fabric/worker
 
-go 1.24
+go 1.24.13
 
 require (
 	google.golang.org/grpc v1.74.2
