@@ -5,7 +5,7 @@ import grpc
 from . import worker_pb2 as worker__pb2
 
 
-class WorkerControlStub:
+class WorkerControlStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -21,7 +21,7 @@ class WorkerControlStub:
                 _registered_method=True)
 
 
-class WorkerControlServicer:
+class WorkerControlServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Connect(self, request_iterator, context):
@@ -46,7 +46,7 @@ def add_WorkerControlServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class WorkerControl:
+class WorkerControl(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod

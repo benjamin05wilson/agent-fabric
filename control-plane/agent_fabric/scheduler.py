@@ -101,7 +101,8 @@ class Scheduler:
     The baseline placed one run per transaction and re-read up to 500 queued runs, every
     healthy worker, and per-project running counts for each placement, which capped
     throughput at roughly 25 placements per second regardless of fleet size (see
-    docs/benchmark-report.md). This version reads those inputs once per batch, places up
+    benchmarks/reports/2026-09-02-batch-scheduler/REPORT.md).
+    This version reads those inputs once per batch, places up
     to `scheduler_batch_size` runs against an in-memory capacity view, and writes the
     attempts, run transitions, worker reservations, and outbox events in bulk.
 
@@ -151,7 +152,7 @@ class Scheduler:
             # Backpressure: an offer only becomes work once the gateway has processed the
             # worker's acknowledgement. Without this bound the batch scheduler out-runs the
             # gateway, offers expire unseen, and retry-safe runs burn their attempts
-            # (measured in docs/benchmark-report.md).
+            # (measured in benchmarks/reports/2026-09-02-batch-scheduler/REPORT.md).
             outstanding = await session.scalar(
                 select(func.count())
                 .select_from(Attempt)

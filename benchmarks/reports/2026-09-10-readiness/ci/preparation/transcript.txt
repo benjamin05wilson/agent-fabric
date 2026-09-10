@@ -1,0 +1,578 @@
+$ git rev-parse HEAD
+9101a3d1ade0f3e0d765c178681c1c7f113e6783
+
+
+exit_code=0
+$ git status --porcelain
+
+
+exit_code=0
+$ docker version --format {{json .}}
+{"Client":{"Platform":{"Name":"Docker Engine - Community"},"Version":"28.0.4","ApiVersion":"1.48","DefaultAPIVersion":"1.48","GitCommit":"b8034c0","GoVersion":"go1.23.7","Os":"linux","Arch":"amd64","BuildTime":"Tue Mar 25 15:07:16 2025","Context":"default"},"Server":{"Platform":{"Name":"Docker Engine - Community"},"Components":[{"Name":"Engine","Version":"28.0.4","Details":{"ApiVersion":"1.48","Arch":"amd64","BuildTime":"Tue Mar 25 15:07:16 2025","Experimental":"false","GitCommit":"6430e49","GoVersion":"go1.23.7","KernelVersion":"6.17.0-1022-azure","MinAPIVersion":"1.24","Os":"linux"}},{"Name":"containerd","Version":"v2.3.4","Details":{"GitCommit":"db8809540e1a7a9da5d518876894933ff55692ab"}},{"Name":"runc","Version":"1.5.1","Details":{"GitCommit":"v1.5.1-0-g8f2685a4"}},{"Name":"docker-init","Version":"0.19.0","Details":{"GitCommit":"de40ad0"}}],"Version":"28.0.4","ApiVersion":"1.48","MinAPIVersion":"1.24","GitCommit":"6430e49","GoVersion":"go1.23.7","Os":"linux","Arch":"amd64","KernelVersion":"6.17.0-1022-azure","BuildTime":"2025-03-25T15:07:16.000000000+00:00"}}
+
+
+exit_code=0
+$ docker compose version
+Docker Compose version v2.38.2
+
+
+exit_code=0
+$ docker compose -p agent-fabric-demo-ae10f7f6a6c8 -f <REPO>/compose.demo.yml --profile tools pull --ignore-buildable
+
+ scheduler Skipped - Image can be built 
+ regressions Skipped - Image can be built 
+ api Skipped - Image can be built 
+ grpc Skipped - Image can be built 
+ demo Skipped - Image can be built 
+ outbox Skipped - Image can be built 
+ minio Pulling 
+ redis Pulling 
+ postgres Pulling 
+ 897d797d2723 Pulling fs layer 
+ d85eda7b0b14 Pulling fs layer 
+ 9516b0cd89c9 Pulling fs layer 
+ de4b872bfdc3 Pulling fs layer 
+ 2c96e5a02ba0 Pulling fs layer 
+ 4f4fb700ef54 Pulling fs layer 
+ 41caa0265cb5 Pulling fs layer 
+ 2c96e5a02ba0 Waiting 
+ 4f4fb700ef54 Waiting 
+ 41caa0265cb5 Waiting 
+ de4b872bfdc3 Waiting 
+ dd15713b0f22 Pulling fs layer 
+ fd312a3c94fc Pulling fs layer 
+ 02e05d20c69e Pulling fs layer 
+ dd15713b0f22 Waiting 
+ 1f08d9fb7d7d Pulling fs layer 
+ b452b5fb7338 Pulling fs layer 
+ e14ab7c7ae26 Pulling fs layer 
+ fd312a3c94fc Waiting 
+ 3bf7f4428838 Pulling fs layer 
+ adc9ba906e83 Pulling fs layer 
+ 02e05d20c69e Waiting 
+ 1611ffcaf8be Pulling fs layer 
+ 1f08d9fb7d7d Waiting 
+ b452b5fb7338 Waiting 
+ 3bf7f4428838 Waiting 
+ e14ab7c7ae26 Waiting 
+ adc9ba906e83 Waiting 
+ 1611ffcaf8be Waiting 
+ 55afa1ecc21d Already exists 
+ 4d80c046a9c7 Pulling fs layer 
+ 592349920552 Pulling fs layer 
+ a12187db4b17 Pulling fs layer 
+ 5858a3f690ea Pulling fs layer 
+ 75de48f507ff Pulling fs layer 
+ d884d6f49732 Pulling fs layer 
+ b36c1b75fdb7 Pulling fs layer 
+ f070a6577866 Pulling fs layer 
+ 4d80c046a9c7 Waiting 
+ 7f3590dcd843 Pulling fs layer 
+ 592349920552 Waiting 
+ a12187db4b17 Waiting 
+ 5858a3f690ea Waiting 
+ 75de48f507ff Waiting 
+ d884d6f49732 Waiting 
+ 7f3590dcd843 Waiting 
+ b36c1b75fdb7 Waiting 
+ f070a6577866 Waiting 
+ d85eda7b0b14 Downloading [==================================================>]     952B/952B
+ d85eda7b0b14 Verifying Checksum 
+ d85eda7b0b14 Download complete 
+ 9516b0cd89c9 Downloading [>                                                  ]  3.457kB/194.3kB
+ 897d797d2723 Downloading [>                                                  ]  48.51kB/3.647MB
+ 9516b0cd89c9 Downloading [==================================================>]  194.3kB/194.3kB
+ 9516b0cd89c9 Verifying Checksum 
+ 9516b0cd89c9 Download complete 
+ 897d797d2723 Verifying Checksum 
+ 897d797d2723 Download complete 
+ 897d797d2723 Extracting [>                                                  ]  65.54kB/3.647MB
+ de4b872bfdc3 Downloading [>                                                  ]  130.4kB/12.42MB
+ 2c96e5a02ba0 Downloading [==================================================>]     100B/100B
+ 2c96e5a02ba0 Verifying Checksum 
+ 2c96e5a02ba0 Download complete 
+ 4f4fb700ef54 Download complete 
+ 41caa0265cb5 Downloading [==================================================>]     604B/604B
+ 41caa0265cb5 Verifying Checksum 
+ 41caa0265cb5 Download complete 
+ de4b872bfdc3 Verifying Checksum 
+ de4b872bfdc3 Download complete 
+ 897d797d2723 Extracting [==================================================>]  3.647MB/3.647MB
+ 897d797d2723 Extracting [==================================================>]  3.647MB/3.647MB
+ dd15713b0f22 Downloading [>                                                  ]  81.28kB/7.24MB
+ 897d797d2723 Pull complete 
+ d85eda7b0b14 Extracting [==================================================>]     952B/952B
+ d85eda7b0b14 Extracting [==================================================>]     952B/952B
+ fd312a3c94fc Downloading [>                                                  ]  32.13kB/1.637MB
+ 02e05d20c69e Downloading [=>                                                 ]  3.499kB/122.7kB
+ 02e05d20c69e Downloading [==================================================>]  122.7kB/122.7kB
+ 02e05d20c69e Verifying Checksum 
+ 02e05d20c69e Download complete 
+ fd312a3c94fc Verifying Checksum 
+ fd312a3c94fc Download complete 
+ dd15713b0f22 Verifying Checksum 
+ dd15713b0f22 Download complete 
+ dd15713b0f22 Extracting [>                                                  ]   98.3kB/7.24MB
+ e14ab7c7ae26 Downloading [>                                                  ]  32.13kB/2.402MB
+ b452b5fb7338 Downloading [>                                                  ]    114kB/11.19MB
+ 1f08d9fb7d7d Downloading [>                                                  ]    409kB/39.39MB
+ dd15713b0f22 Extracting [==>                                                ]  393.2kB/7.24MB
+ e14ab7c7ae26 Verifying Checksum 
+ e14ab7c7ae26 Download complete 
+ b452b5fb7338 Downloading [======================>                            ]  4.931MB/11.19MB
+ 3bf7f4428838 Downloading [>                                                  ]  3.458kB/180.3kB
+ 1f08d9fb7d7d Downloading [=============>                                     ]  10.65MB/39.39MB
+ 3bf7f4428838 Verifying Checksum 
+ 3bf7f4428838 Download complete 
+ b452b5fb7338 Verifying Checksum 
+ b452b5fb7338 Download complete 
+ dd15713b0f22 Extracting [============>                                      ]  1.868MB/7.24MB
+ adc9ba906e83 Downloading [==============>                                    ]  3.501kB/11.88kB
+ adc9ba906e83 Download complete 
+ 1611ffcaf8be Downloading [==================================================>]     498B/498B
+ 1611ffcaf8be Verifying Checksum 
+ 1611ffcaf8be Download complete 
+ 1f08d9fb7d7d Downloading [===========================================>       ]  34.41MB/39.39MB
+ 1f08d9fb7d7d Download complete 
+ 4d80c046a9c7 Downloading [==================================================>]     970B/970B
+ 4d80c046a9c7 Verifying Checksum 
+ 4d80c046a9c7 Download complete 
+ 4d80c046a9c7 Extracting [==================================================>]     970B/970B
+ 4d80c046a9c7 Extracting [==================================================>]     970B/970B
+ 592349920552 Downloading [>                                                  ]  15.79kB/900.3kB
+ dd15713b0f22 Extracting [===========================>                       ]  3.932MB/7.24MB
+ a12187db4b17 Downloading [==================================================>]     116B/116B
+ a12187db4b17 Verifying Checksum 
+ a12187db4b17 Download complete 
+ 592349920552 Downloading [==================================================>]  900.3kB/900.3kB
+ 592349920552 Verifying Checksum 
+ 592349920552 Download complete 
+ 75de48f507ff Downloading [==================================================>]  9.997kB/9.997kB
+ 75de48f507ff Verifying Checksum 
+ 75de48f507ff Download complete 
+ d884d6f49732 Downloading [==================================================>]     129B/129B
+ d884d6f49732 Verifying Checksum 
+ d884d6f49732 Download complete 
+ b36c1b75fdb7 Downloading [==================================================>]     169B/169B
+ b36c1b75fdb7 Verifying Checksum 
+ b36c1b75fdb7 Download complete 
+ 5858a3f690ea Downloading [>                                                  ]  536.8kB/112.4MB
+ f070a6577866 Downloading [============================>                      ]  3.501kB/6.111kB
+ f070a6577866 Downloading [==================================================>]  6.111kB/6.111kB
+ f070a6577866 Verifying Checksum 
+ f070a6577866 Download complete 
+ dd15713b0f22 Extracting [============================================>      ]   6.39MB/7.24MB
+ 7f3590dcd843 Downloading [==================================================>]     184B/184B
+ 7f3590dcd843 Verifying Checksum 
+ 7f3590dcd843 Download complete 
+ 5858a3f690ea Downloading [=>                                                 ]   3.76MB/112.4MB
+ 4d80c046a9c7 Pull complete 
+ 592349920552 Extracting [=>                                                 ]  32.77kB/900.3kB
+ 5858a3f690ea Downloading [===>                                               ]  6.968MB/112.4MB
+ 5858a3f690ea Downloading [=============>                                     ]  29.93MB/112.4MB
+ 592349920552 Extracting [==============>                                    ]  262.1kB/900.3kB
+ 5858a3f690ea Downloading [===========================>                       ]  60.88MB/112.4MB
+ 5858a3f690ea Downloading [==========================================>        ]  96.57MB/112.4MB
+ 5858a3f690ea Verifying Checksum 
+ 5858a3f690ea Download complete 
+ dd15713b0f22 Extracting [============================================>      ]  6.488MB/7.24MB
+ dd15713b0f22 Extracting [==================================================>]   7.24MB/7.24MB
+ dd15713b0f22 Pull complete 
+ 592349920552 Extracting [====================>                              ]  360.4kB/900.3kB
+ 592349920552 Extracting [==================================================>]  900.3kB/900.3kB
+ 592349920552 Extracting [==================================================>]  900.3kB/900.3kB
+ fd312a3c94fc Extracting [=>                                                 ]  32.77kB/1.637MB
+ 592349920552 Pull complete 
+ fd312a3c94fc Extracting [=======>                                           ]  229.4kB/1.637MB
+ a12187db4b17 Extracting [==================================================>]     116B/116B
+ a12187db4b17 Extracting [==================================================>]     116B/116B
+ fd312a3c94fc Extracting [==================================================>]  1.637MB/1.637MB
+ fd312a3c94fc Extracting [==================================================>]  1.637MB/1.637MB
+ d85eda7b0b14 Pull complete 
+ a12187db4b17 Pull complete 
+ fd312a3c94fc Pull complete 
+ 9516b0cd89c9 Extracting [========>                                          ]  32.77kB/194.3kB
+ 02e05d20c69e Extracting [=============>                                     ]  32.77kB/122.7kB
+ 9516b0cd89c9 Extracting [==================================================>]  194.3kB/194.3kB
+ 02e05d20c69e Extracting [==================================================>]  122.7kB/122.7kB
+ 02e05d20c69e Extracting [==================================================>]  122.7kB/122.7kB
+ 5858a3f690ea Extracting [>                                                  ]  557.1kB/112.4MB
+ 9516b0cd89c9 Extracting [==================================================>]  194.3kB/194.3kB
+ 02e05d20c69e Pull complete 
+ 1f08d9fb7d7d Extracting [>                                                  ]    426kB/39.39MB
+ 1f08d9fb7d7d Extracting [========>                                          ]   6.39MB/39.39MB
+ 5858a3f690ea Extracting [>                                                  ]  2.228MB/112.4MB
+ 1f08d9fb7d7d Extracting [===============>                                   ]  11.93MB/39.39MB
+ 5858a3f690ea Extracting [===>                                               ]  8.356MB/112.4MB
+ 9516b0cd89c9 Pull complete 
+ de4b872bfdc3 Extracting [>                                                  ]  131.1kB/12.42MB
+ 5858a3f690ea Extracting [======>                                            ]  14.48MB/112.4MB
+ 1f08d9fb7d7d Extracting [=====================>                             ]  16.61MB/39.39MB
+ de4b872bfdc3 Extracting [==========>                                        ]  2.621MB/12.42MB
+ 5858a3f690ea Extracting [=========>                                         ]  20.61MB/112.4MB
+ de4b872bfdc3 Extracting [=============================>                     ]  7.209MB/12.42MB
+ 1f08d9fb7d7d Extracting [============================>                      ]  22.58MB/39.39MB
+ 5858a3f690ea Extracting [============>                                      ]   27.3MB/112.4MB
+ 1f08d9fb7d7d Extracting [==================================>                ]  26.84MB/39.39MB
+ de4b872bfdc3 Extracting [===========================================>       ]  10.88MB/12.42MB
+ de4b872bfdc3 Extracting [==================================================>]  12.42MB/12.42MB
+ de4b872bfdc3 Pull complete 
+ 2c96e5a02ba0 Extracting [==================================================>]     100B/100B
+ 2c96e5a02ba0 Extracting [==================================================>]     100B/100B
+ 2c96e5a02ba0 Pull complete 
+ 4f4fb700ef54 Extracting [==================================================>]      32B/32B
+ 4f4fb700ef54 Extracting [==================================================>]      32B/32B
+ 5858a3f690ea Extracting [==============>                                    ]  32.87MB/112.4MB
+ 1f08d9fb7d7d Extracting [======================================>            ]  30.24MB/39.39MB
+ 4f4fb700ef54 Pull complete 
+ 41caa0265cb5 Extracting [==================================================>]     604B/604B
+ 41caa0265cb5 Extracting [==================================================>]     604B/604B
+ 41caa0265cb5 Pull complete 
+ redis Pulled 
+ 5858a3f690ea Extracting [=================>                                 ]  39.55MB/112.4MB
+ 1f08d9fb7d7d Extracting [===============================================>   ]  37.06MB/39.39MB
+ 1f08d9fb7d7d Extracting [==================================================>]  39.39MB/39.39MB
+ 1f08d9fb7d7d Pull complete 
+ b452b5fb7338 Extracting [>                                                  ]  131.1kB/11.19MB
+ 5858a3f690ea Extracting [====================>                              ]  46.24MB/112.4MB
+ b452b5fb7338 Extracting [===========================>                       ]   6.16MB/11.19MB
+ 5858a3f690ea Extracting [=======================>                           ]  53.48MB/112.4MB
+ b452b5fb7338 Extracting [==================================================>]  11.19MB/11.19MB
+ b452b5fb7338 Pull complete 
+ e14ab7c7ae26 Extracting [>                                                  ]  32.77kB/2.402MB
+ 5858a3f690ea Extracting [=========================>                         ]  56.26MB/112.4MB
+ e14ab7c7ae26 Extracting [==================================================>]  2.402MB/2.402MB
+ e14ab7c7ae26 Pull complete 
+ 3bf7f4428838 Extracting [=========>                                         ]  32.77kB/180.3kB
+ 3bf7f4428838 Extracting [==================================================>]  180.3kB/180.3kB
+ 3bf7f4428838 Extracting [==================================================>]  180.3kB/180.3kB
+ 3bf7f4428838 Pull complete 
+ adc9ba906e83 Extracting [==================================================>]  11.88kB/11.88kB
+ adc9ba906e83 Extracting [==================================================>]  11.88kB/11.88kB
+ adc9ba906e83 Pull complete 
+ 1611ffcaf8be Extracting [==================================================>]     498B/498B
+ 1611ffcaf8be Extracting [==================================================>]     498B/498B
+ 1611ffcaf8be Pull complete 
+ minio Pulled 
+ 5858a3f690ea Extracting [==========================>                        ]  60.16MB/112.4MB
+ 5858a3f690ea Extracting [==============================>                    ]  67.96MB/112.4MB
+ 5858a3f690ea Extracting [=================================>                 ]  75.76MB/112.4MB
+ 5858a3f690ea Extracting [====================================>              ]  81.89MB/112.4MB
+ 5858a3f690ea Extracting [====================================>              ]     83MB/112.4MB
+ 5858a3f690ea Extracting [======================================>            ]  85.79MB/112.4MB
+ 5858a3f690ea Extracting [=======================================>           ]  89.69MB/112.4MB
+ 5858a3f690ea Extracting [=========================================>         ]  94.14MB/112.4MB
+ 5858a3f690ea Extracting [============================================>      ]  99.16MB/112.4MB
+ 5858a3f690ea Extracting [================================================>  ]  109.2MB/112.4MB
+ 5858a3f690ea Extracting [==================================================>]  112.4MB/112.4MB
+ 5858a3f690ea Pull complete 
+ 75de48f507ff Extracting [==================================================>]  9.997kB/9.997kB
+ 75de48f507ff Extracting [==================================================>]  9.997kB/9.997kB
+ 75de48f507ff Pull complete 
+ d884d6f49732 Extracting [==================================================>]     129B/129B
+ d884d6f49732 Extracting [==================================================>]     129B/129B
+ d884d6f49732 Pull complete 
+ b36c1b75fdb7 Extracting [==================================================>]     169B/169B
+ b36c1b75fdb7 Extracting [==================================================>]     169B/169B
+ b36c1b75fdb7 Pull complete 
+ f070a6577866 Extracting [==================================================>]  6.111kB/6.111kB
+ f070a6577866 Extracting [==================================================>]  6.111kB/6.111kB
+ f070a6577866 Pull complete 
+ 7f3590dcd843 Extracting [==================================================>]     184B/184B
+ 7f3590dcd843 Extracting [==================================================>]     184B/184B
+ 7f3590dcd843 Pull complete 
+ postgres Pulled 
+
+exit_code=0
+$ docker compose -p agent-fabric-demo-ae10f7f6a6c8 -f <REPO>/compose.demo.yml --profile tools build
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.24kB done
+#1 DONE 0.0s
+
+#2 [scheduler internal] load build definition from Dockerfile
+#2 transferring dockerfile: 696B done
+#2 DONE 0.0s
+
+#3 [auth] library/python:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [grpc internal] load metadata for docker.io/library/python:3.12.13-slim
+#4 ...
+
+#5 [scheduler internal] load metadata for ghcr.io/astral-sh/uv:0.12.0
+#5 DONE 0.2s
+
+#4 [demo internal] load metadata for docker.io/library/python:3.12.13-slim
+#4 DONE 0.4s
+
+#6 [demo internal] load .dockerignore
+#6 transferring context: 140B done
+#6 DONE 0.0s
+
+#7 [scheduler internal] load build context
+#7 transferring context: 305.70kB 0.0s done
+#7 DONE 0.0s
+
+#8 [regressions internal] load build context
+#8 transferring context: 364.84kB 0.0s done
+#8 DONE 0.0s
+
+#9 [regressions runtime 1/8] FROM docker.io/library/python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
+#9 resolve docker.io/library/python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 done
+#9 sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 10.37kB / 10.37kB done
+#9 sha256:d657ab0ade19f404a6ccc883ab399540de667aff751748ce23c07330c5a89e64 1.75kB / 1.75kB done
+#9 sha256:54a0b2beae90fe14c2131f1e880e1388c9df77390bc260d7317e589765e064e8 5.64kB / 5.64kB done
+#9 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 5.24MB / 29.78MB 0.1s
+#9 sha256:5a31db4cd47898e862a567028aa41f7a11d814cf69be6904173402a8b8eac5cb 0B / 1.29MB 0.1s
+#9 sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 10.37kB / 10.37kB done
+#9 sha256:d657ab0ade19f404a6ccc883ab399540de667aff751748ce23c07330c5a89e64 1.75kB / 1.75kB done
+#9 sha256:54a0b2beae90fe14c2131f1e880e1388c9df77390bc260d7317e589765e064e8 5.64kB / 5.64kB done
+#9 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 29.78MB / 29.78MB 0.2s done
+#9 sha256:5a31db4cd47898e862a567028aa41f7a11d814cf69be6904173402a8b8eac5cb 1.29MB / 1.29MB 0.2s done
+#9 sha256:c85ad0bcaca895afa08053538ec1ea7642c7e9e05f5684d18e3627a2316ca8ae 0B / 12.11MB 0.2s
+#9 sha256:b3c7a9bdb4f2a30d0a1358438d1539c06b86da99135cfd9d92756863cc87ae18 249B / 249B 0.2s
+#9 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 29.78MB / 29.78MB 0.2s done
+#9 sha256:5a31db4cd47898e862a567028aa41f7a11d814cf69be6904173402a8b8eac5cb 1.29MB / 1.29MB 0.2s done
+#9 sha256:c85ad0bcaca895afa08053538ec1ea7642c7e9e05f5684d18e3627a2316ca8ae 11.53MB / 12.11MB 0.3s
+#9 sha256:b3c7a9bdb4f2a30d0a1358438d1539c06b86da99135cfd9d92756863cc87ae18 249B / 249B 0.2s done
+#9 extracting sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d
+#9 sha256:c85ad0bcaca895afa08053538ec1ea7642c7e9e05f5684d18e3627a2316ca8ae 12.11MB / 12.11MB 0.3s done
+#9 ...
+
+#10 [scheduler] FROM ghcr.io/astral-sh/uv:0.12.0@sha256:606e70c71c852d03f611b1e56a195d08648507018a7057fab82c4974c4eae105
+#10 resolve ghcr.io/astral-sh/uv:0.12.0@sha256:606e70c71c852d03f611b1e56a195d08648507018a7057fab82c4974c4eae105 done
+#10 sha256:602ed13aafa9baf477afa43e6607a460cc99b662f282468042f98b7ef7b7fd25 98B / 98B 0.0s done
+#10 sha256:606e70c71c852d03f611b1e56a195d08648507018a7057fab82c4974c4eae105 2.19kB / 2.19kB done
+#10 sha256:e342549a51f0b0a09aa12a9ffd370ff8efd56b31ae1b2c37d4a8d91f106903be 669B / 669B done
+#10 sha256:820561967725d6b407c22d8e2df5955b7b0d156bfd4a0812e9affec9ede9b91b 1.30kB / 1.30kB done
+#10 sha256:1ff0c3c6eaa507044990592056b27de4f499d4cb5b50c407e32ae2e6a9427a23 22.24MB / 22.24MB 0.2s done
+#10 extracting sha256:1ff0c3c6eaa507044990592056b27de4f499d4cb5b50c407e32ae2e6a9427a23 0.4s done
+#10 extracting sha256:602ed13aafa9baf477afa43e6607a460cc99b662f282468042f98b7ef7b7fd25 done
+#10 DONE 0.6s
+
+#9 [regressions runtime 1/8] FROM docker.io/library/python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
+#9 extracting sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 1.0s done
+#9 extracting sha256:5a31db4cd47898e862a567028aa41f7a11d814cf69be6904173402a8b8eac5cb
+#9 extracting sha256:5a31db4cd47898e862a567028aa41f7a11d814cf69be6904173402a8b8eac5cb 0.1s done
+#9 extracting sha256:c85ad0bcaca895afa08053538ec1ea7642c7e9e05f5684d18e3627a2316ca8ae
+#9 extracting sha256:c85ad0bcaca895afa08053538ec1ea7642c7e9e05f5684d18e3627a2316ca8ae 0.5s done
+#9 extracting sha256:b3c7a9bdb4f2a30d0a1358438d1539c06b86da99135cfd9d92756863cc87ae18
+#9 extracting sha256:b3c7a9bdb4f2a30d0a1358438d1539c06b86da99135cfd9d92756863cc87ae18 done
+#9 DONE 2.0s
+
+#11 [api runtime 2/8] COPY --from=ghcr.io/astral-sh/uv:0.12.0 /uv /usr/local/bin/uv
+#11 DONE 0.0s
+
+#12 [regressions runtime 3/8] WORKDIR /app
+#12 DONE 0.0s
+
+#13 [regressions runtime 4/8] COPY pyproject.toml uv.lock README.md ./
+#13 DONE 0.0s
+
+#14 [outbox runtime 5/8] COPY control-plane ./control-plane
+#14 DONE 0.0s
+
+#15 [api runtime 6/8] COPY alembic.ini ./
+#15 DONE 0.0s
+
+#16 [grpc runtime 7/8] COPY migrations ./migrations
+#16 DONE 0.0s
+
+#17 [scheduler runtime 8/8] RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-editable
+#17 0.295 Using CPython 3.12.13 interpreter at: /usr/local/bin/python3
+#17 0.295 Creating virtual environment at: .venv
+#17 0.312    Building agent-fabric @ file:///app
+#17 0.398 Downloading grpcio (6.7MiB)
+#17 0.398 Downloading uvloop (4.2MiB)
+#17 0.400 Downloading pycryptodome (2.2MiB)
+#17 0.401 Downloading pydantic-core (2.0MiB)
+#17 0.403 Downloading sqlalchemy (3.2MiB)
+#17 0.403 Downloading asyncpg (3.4MiB)
+#17 0.778  Downloaded pydantic-core
+#17 0.830  Downloaded asyncpg
+#17 0.850  Downloaded uvloop
+#17 0.852  Downloaded grpcio
+#17 0.888  Downloaded pycryptodome
+#17 0.899  Downloaded sqlalchemy
+#17 1.507       Built agent-fabric @ file:///app
+#17 1.509 Prepared 60 packages in 1.20s
+#17 1.510 warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+#17 1.510          If the cache and target directories are on different filesystems, hardlinking may not be supported.
+#17 1.510          If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+#17 1.719 Installed 60 packages in 209ms
+#17 1.719  + agent-fabric==0.1.0 (from file:///app)
+#17 1.719  + alembic==1.19.2
+#17 1.719  + annotated-doc==0.0.5
+#17 1.720  + annotated-types==0.8.0
+#17 1.720  + anyio==4.15.1
+#17 1.720  + argon2-cffi==25.1.0
+#17 1.720  + argon2-cffi-bindings==26.1.0
+#17 1.720  + asgiref==3.12.1
+#17 1.720  + asyncpg==0.31.0
+#17 1.720  + certifi==2026.7.22
+#17 1.720  + cffi==2.1.1
+#17 1.720  + click==8.5.0
+#17 1.720  + fastapi==0.141.1
+#17 1.720  + googleapis-common-protos==1.75.3
+#17 1.720  + greenlet==3.5.5
+#17 1.720  + grpcio==1.83.1
+#17 1.720  + h11==0.16.0
+#17 1.720  + httpcore==1.0.9
+#17 1.720  + httptools==0.8.0
+#17 1.721  + httpx==0.28.1
+#17 1.721  + idna==3.19
+#17 1.721  + mako==1.4.1
+#17 1.721  + markupsafe==3.0.3
+#17 1.721  + minio==7.2.20
+#17 1.721  + opentelemetry-api==1.44.0
+#17 1.721  + opentelemetry-exporter-otlp-proto-common==1.44.0
+#17 1.721  + opentelemetry-exporter-otlp-proto-grpc==1.44.0
+#17 1.721  + opentelemetry-instrumentation==0.65b0
+#17 1.721  + opentelemetry-instrumentation-asgi==0.65b0
+#17 1.721  + opentelemetry-instrumentation-fastapi==0.65b0
+#17 1.721  + opentelemetry-instrumentation-grpc==0.65b0
+#17 1.721  + opentelemetry-instrumentation-redis==0.65b0
+#17 1.721  + opentelemetry-instrumentation-sqlalchemy==0.65b0
+#17 1.721  + opentelemetry-proto==1.44.0
+#17 1.721  + opentelemetry-sdk==1.44.0
+#17 1.721  + opentelemetry-semantic-conventions==0.65b0
+#17 1.721  + opentelemetry-util-http==0.65b0
+#17 1.721  + packaging==26.3
+#17 1.721  + prometheus-client==0.26.0
+#17 1.721  + protobuf==6.33.6
+#17 1.721  + pycparser==3.0
+#17 1.721  + pycryptodome==3.23.0
+#17 1.721  + pydantic==2.13.5
+#17 1.721  + pydantic-core==2.46.5
+#17 1.721  + pydantic-settings==2.15.0
+#17 1.721  + pyjwt==2.13.0
+#17 1.721  + python-dotenv==1.2.3
+#17 1.721  + python-json-logger==3.3.0
+#17 1.722  + pyyaml==6.0.3
+#17 1.722  + redis==5.3.1
+#17 1.722  + sqlalchemy==2.0.52
+#17 1.722  + starlette==1.6.0
+#17 1.722  + typing-extensions==4.16.0
+#17 1.722  + typing-inspection==0.4.4
+#17 1.722  + urllib3==2.7.0
+#17 1.722  + uvicorn==0.52.4
+#17 1.722  + uvloop==0.22.1
+#17 1.722  + watchfiles==1.2.0
+#17 1.722  + websockets==17.1
+#17 1.722  + wrapt==2.4.0
+#17 DONE 2.1s
+
+#18 [regressions runtime 6/8] COPY alembic.ini ./
+#18 CACHED
+
+#19 [regressions runtime 7/8] COPY migrations ./migrations
+#19 CACHED
+
+#20 [regressions runtime 4/8] COPY pyproject.toml uv.lock README.md ./
+#20 CACHED
+
+#21 [regressions runtime 5/8] COPY control-plane ./control-plane
+#21 CACHED
+
+#22 [regressions runtime 8/8] RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-editable
+#22 CACHED
+
+#23 [regressions test 1/2] COPY tests ./tests
+#23 DONE 0.1s
+
+#24 [api] exporting to image
+#24 exporting layers
+#24 exporting layers 1.3s done
+#24 writing image sha256:9ac3c26335aa117d91fde1de36bc12f3587c3c8f30086474e1e8bbc8014dfa07 done
+#24 naming to docker.io/library/agent-fabric-demo-control:local done
+#24 DONE 1.3s
+
+#25 [scheduler] exporting to image
+#25 exporting layers 1.3s done
+#25 writing image sha256:9ac3c26335aa117d91fde1de36bc12f3587c3c8f30086474e1e8bbc8014dfa07 done
+#25 naming to docker.io/library/agent-fabric-demo-control:local done
+#25 DONE 1.3s
+
+#26 [grpc] exporting to image
+#26 exporting layers 1.3s done
+#26 writing image sha256:9ac3c26335aa117d91fde1de36bc12f3587c3c8f30086474e1e8bbc8014dfa07 done
+#26 naming to docker.io/library/agent-fabric-demo-control:local done
+#26 DONE 1.3s
+
+#27 [demo] exporting to image
+#27 exporting layers 1.3s done
+#27 writing image sha256:9ac3c26335aa117d91fde1de36bc12f3587c3c8f30086474e1e8bbc8014dfa07 done
+#27 naming to docker.io/library/agent-fabric-demo-control:local done
+#27 DONE 1.3s
+
+#28 [outbox] exporting to image
+#28 exporting layers 1.3s done
+#28 writing image sha256:9ac3c26335aa117d91fde1de36bc12f3587c3c8f30086474e1e8bbc8014dfa07 done
+#28 naming to docker.io/library/agent-fabric-demo-control:local done
+#28 DONE 1.3s
+
+#29 [scheduler] resolving provenance for metadata file
+#29 DONE 0.0s
+
+#30 [demo] resolving provenance for metadata file
+#30 DONE 0.0s
+
+#31 [outbox] resolving provenance for metadata file
+#31 DONE 0.0s
+
+#32 [grpc] resolving provenance for metadata file
+#32 DONE 0.0s
+
+#33 [api] resolving provenance for metadata file
+#33 DONE 0.0s
+
+#34 [regressions test 2/2] RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --extra dev --no-editable
+#34 0.670 Downloading ruff (9.8MiB)
+#34 0.675 Downloading mypy (14.1MiB)
+#34 0.676 Downloading pygments (1.2MiB)
+#34 0.676 Downloading grpcio-tools (2.5MiB)
+#34 0.934  Downloaded grpcio-tools
+#34 1.030  Downloaded ruff
+#34 1.112  Downloaded pygments
+#34 1.321  Downloaded mypy
+#34 1.322 Prepared 15 packages in 738ms
+#34 1.324 warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+#34 1.324          If the cache and target directories are on different filesystems, hardlinking may not be supported.
+#34 1.324          If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+#34 1.648 Installed 17 packages in 326ms
+#34 1.648  + asyncpg-stubs==0.31.3
+#34 1.648  + coverage==7.16.0
+#34 1.648  + grpcio-tools==1.74.0
+#34 1.648  + iniconfig==2.3.0
+#34 1.649  + librt==0.15.0
+#34 1.649  + mypy==1.20.2
+#34 1.649  + mypy-extensions==1.1.0
+#34 1.649  + pathspec==1.1.1
+#34 1.649  + pluggy==1.6.0
+#34 1.649  + pygments==2.21.0
+#34 1.649  + pytest==8.4.2
+#34 1.649  + pytest-asyncio==0.26.0
+#34 1.649  + pytest-cov==6.3.0
+#34 1.649  + ruff==0.16.6
+#34 1.649  + setuptools==84.0.0
+#34 1.649  + types-grpcio==1.83.0.20260730
+#34 1.649  + types-protobuf==6.32.1.20260221
+#34 DONE 1.7s
+
+#35 [regressions] exporting to image
+#35 exporting layers 0.8s done
+#35 writing image sha256:68c7b49bebe5c2cf5e1de56d27a65f617b41a95034913d03f70c1443530b7b32 done
+#35 naming to docker.io/library/agent-fabric-demo-tests:local done
+#35 DONE 0.8s
+
+#36 [regressions] resolving provenance for metadata file
+#36 DONE 0.0s
+
+ scheduler  Built
+ outbox  Built
+ demo  Built
+ regressions  Built
+ grpc  Built
+ api  Built
+
+exit_code=0

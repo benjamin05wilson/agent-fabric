@@ -1,17 +1,18 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.29.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "agent-fabric"
 version = "0.1.0"
 description = "A sandboxed, lease-based agent execution control plane"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "alembic>=1.13,<2",
   "asyncpg>=0.29,<1",
   "fastapi>=0.115,<1",
-  "grpcio>=1.66,<2",
+  "grpcio>=1.74,<2",
+  "protobuf>=6.31.1,<7",
   "httpx>=0.27,<1",
   "minio>=7.2,<8",
   "opentelemetry-api>=1.27,<2",
@@ -32,7 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "asyncpg-stubs>=0.29,<1",
-  "grpcio-tools>=1.66,<2",
+  "grpcio-tools==1.74.0",
   "mypy>=1.11,<2",
   "pytest>=8,<9",
   "pytest-asyncio>=0.24,<1",
@@ -40,6 +41,9 @@ dev = [
   "ruff>=0.6,<1",
   "types-grpcio>=1.0,<2",
   "types-protobuf>=5,<7",
+]
+evidence = [
+    "matplotlib>=3.10,<4",
 ]
 
 [project.scripts]

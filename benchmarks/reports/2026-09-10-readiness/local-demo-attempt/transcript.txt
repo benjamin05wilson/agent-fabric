@@ -1,0 +1,39 @@
+$ git rev-parse HEAD
+fc46b479756023186b3219a03486efdcbef6fa95
+
+
+exit_code=0
+$ git status --porcelain
+ M .dockerignore
+ M .github/workflows/ci.yml
+ M .gitignore
+ M benchmarks/README.md
+ M buf.gen.yaml
+ M control-plane/Dockerfile
+ M control-plane/agent_fabric/generated/worker_pb2.py
+ M control-plane/agent_fabric/generated/worker_pb2.pyi
+ M control-plane/agent_fabric/generated/worker_pb2_grpc.py
+ M control-plane/agent_fabric/loadgen.py
+ M control-plane/agent_fabric/scheduler.py
+ M docker-compose.yml
+ M loadgen/Dockerfile
+ M proto/worker.proto
+ M pyproject.toml
+ M tests/unit/test_loadgen.py
+ M worker/gen/worker.pb.go
+ M worker/gen/worker_grpc.pb.go
+ M worker/go.mod
+ M worker/main.go
+?? .python-version
+?? compose.demo.yml
+?? scripts/demo.py
+?? tests/integration/
+?? uv.lock
+?? worker/sandbox/gvisor_integration_test.go
+
+
+exit_code=0
+$ docker version --format {{json .}}
+ERROR: [Errno 2] No such file or directory: 'docker'
+$ docker compose -p agent-fabric-demo-a4b5041b0692 -f <REPO>/compose.demo.yml logs --no-color --tail 100
+CLEANUP ERROR: [Errno 2] No such file or directory: 'docker'; retry docker compose -p agent-fabric-demo-a4b5041b0692 -f <REPO>/compose.demo.yml down --volumes

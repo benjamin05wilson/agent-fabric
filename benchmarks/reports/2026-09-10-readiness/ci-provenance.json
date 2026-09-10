@@ -1,0 +1,33 @@
+{
+  "ci_run": "https://github.com/benjamin05wilson/agent-fabric/actions/runs/34501897886",
+  "source_commit": "9101a3d1ade0f3e0d765c178681c1c7f113e6783",
+  "scope": "Tiny demo and five durable regressions passed; contracts job failed legacy go_package compatibility in this same run.",
+  "sanitization": "Runner checkout path replaced with <REPO>. No measured values or exit codes changed.",
+  "files": [
+    {
+      "path": "ci/preparation/metadata.json",
+      "original_sha256": "25bf53a1466d3c73aefbbb30d70eeffcca5dc2d6ff96bdad2f08f59baf234d1f",
+      "published_sha256": "25bf53a1466d3c73aefbbb30d70eeffcca5dc2d6ff96bdad2f08f59baf234d1f"
+    },
+    {
+      "path": "ci/preparation/transcript.txt",
+      "original_sha256": "cfd20424322eec23126e95ad7d4fe38986685c4353acd462a4ac41642a73dec1",
+      "published_sha256": "7fececb480fb2297551550277e762e15b232b52695e3b7714534d95049818f00"
+    },
+    {
+      "path": "ci/tiny-demo/metadata.json",
+      "original_sha256": "f1ae84bebda0490e76c40604fb1daaa255d48be7868ab9285da58bfa51835fab",
+      "published_sha256": "f1ae84bebda0490e76c40604fb1daaa255d48be7868ab9285da58bfa51835fab"
+    },
+    {
+      "path": "ci/tiny-demo/result.json",
+      "original_sha256": "a47b3ad3415d5a897f48ccd030506ce4544c6b7c825df3d3cd0accccd0e10240",
+      "published_sha256": "a47b3ad3415d5a897f48ccd030506ce4544c6b7c825df3d3cd0accccd0e10240"
+    },
+    {
+      "path": "ci/tiny-demo/transcript.txt",
+      "original_sha256": "01da7a5fc069f92ad8f0ffa3c9d1ba4fd401cb836f791e7df031d2931b8d7ecd",
+      "published_sha256": "7cbb467b9e6eb91bcc461586ab12ab1aeb7eb46c3b36c78f58da2f22b6fbfcdf"
+    }
+  ]
+}

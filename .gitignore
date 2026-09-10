@@ -13,3 +13,5 @@ coverage.xml
 /bin/
 /gen/
 benchmarks/results/
+
+.cache/

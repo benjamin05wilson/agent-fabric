@@ -1,4 +1,4 @@
-.PHONY: generate lint test test-go build up down loadgen
+.PHONY: generate lint test test-go build up down loadgen demo-prepare demo
 
 generate:
 	docker run --rm -v "$$(pwd):/workspace" -w /workspace bufbuild/buf:1.47.2 generate
@@ -13,7 +13,7 @@ test:
 	docker run --rm agent-fabric-test
 
 test-go:
-	docker run --rm -v "$$(pwd)/worker:/src" -w /src golang:1.24-bookworm sh -c "/usr/local/go/bin/go test ./..."
+	docker run --rm -v "$$(pwd)/worker:/src" -w /src golang:1.24.13-bookworm sh -c "/usr/local/go/bin/go test ./..."
 
 build:
 	docker compose build
@@ -27,3 +27,9 @@ down:
 loadgen:
 	docker build -f loadgen/Dockerfile -t agent-fabric-loadgen .
 	docker run --rm --network agent-fabric_default agent-fabric-loadgen --control grpc:50051 --api http://api:8000 --workers 100 --jobs 1000 --duration 60
+
+demo-prepare:
+	python scripts/demo.py --prepare --output benchmarks/results/preparation
+
+demo:
+	python scripts/demo.py --regressions

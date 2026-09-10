@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import random
 
+import pytest
 from agent_fabric import loadgen
 
 
@@ -111,4 +112,39 @@ def test_busiest_selection_takes_workers_with_in_flight_attempts_first() -> None
 
 def test_parser_rejects_out_of_range_kill_fraction() -> None:
     args = loadgen.parser().parse_args(["--kill-fraction", "1.5"])
-    assert args.kill_fraction == 1.5
+    with pytest.raises(SystemExit, match="--kill-fraction"):
+        loadgen.validate_args(args)
+
+
+async def test_whole_run_deadline_cancels_stalled_submission(monkeypatch) -> None:
+    cancelled = asyncio.Event()
+
+    async def stalled(args):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    monkeypatch.setattr(loadgen, "benchmark", stalled)
+    with pytest.raises(TimeoutError):
+        await loadgen.bounded_benchmark(argparse.Namespace(deadline=0.01))
+    assert cancelled.is_set()
+
+
+def test_success_gate_rejects_failed_jobs_and_reservation_leaks() -> None:
+    result = {
+        "results": {
+            "registration": {"timed_out": False, "durable_workers": 2},
+            "submission": {"accepted": 8},
+        },
+        "audit": {
+            "run_states": {"SUCCEEDED": 8},
+            "attempt_states": {"SUCCEEDED": 8},
+            "reserved_after_run": {"cpu_millis": 0},
+        },
+    }
+    assert loadgen.success_errors(result, 8, 2) == []
+    result["audit"]["run_states"] = {"FAILED": 8}
+    result["audit"]["reserved_after_run"] = {"cpu_millis": 100}
+    assert len(loadgen.success_errors(result, 8, 2)) == 2
+    assert loadgen.success_errors({}, 8, 2)
